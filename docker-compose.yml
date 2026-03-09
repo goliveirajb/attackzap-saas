@@ -6,7 +6,7 @@ services:
     container_name: attackzap-backend
     restart: always
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT:-3306}
@@ -18,16 +18,17 @@ services:
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - N8N_API_URL=${N8N_API_URL}
       - N8N_API_KEY=${N8N_API_KEY}
-      - PORT=3000
+      - PORT=3001
     networks:
       - attackzap
+      - loterias-bet-network
 
   frontend:
     build: ./frontend
     container_name: attackzap-frontend
     restart: always
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     networks:
@@ -36,3 +37,5 @@ services:
 networks:
   attackzap:
     driver: bridge
+  loterias-bet-network:
+    external: true
