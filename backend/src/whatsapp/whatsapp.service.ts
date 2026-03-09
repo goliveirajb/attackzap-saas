@@ -53,11 +53,17 @@ export class WhatsappService {
 
 		this.logger.log(`Instance created: ${instanceName} (ID ${insertId})`);
 
+		// qrcode pode vir como objeto { base64: "...", code: "..." } ou string
+		const rawQr = data?.qrcode;
+		const qrcode = typeof rawQr === "object" && rawQr !== null
+			? rawQr.base64 || rawQr.code || null
+			: rawQr || null;
+
 		return {
 			id: insertId,
 			instanceName,
 			instanceKey,
-			qrcode: data?.qrcode || null,
+			qrcode,
 			status: "connecting",
 		};
 	}
@@ -77,8 +83,13 @@ export class WhatsappService {
 		}
 
 		const data = await res.json();
+		const rawQr = data?.base64 || data?.qrcode;
+		const qrcode = typeof rawQr === "object" && rawQr !== null
+			? rawQr.base64 || rawQr.code || null
+			: rawQr || null;
+
 		return {
-			qrcode: data?.base64 || data?.qrcode || null,
+			qrcode,
 			status: data?.instance?.state || "connecting",
 		};
 	}

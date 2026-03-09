@@ -217,7 +217,7 @@ export default function Instances() {
             </p>
 
             <div className="bg-white rounded-xl p-4 flex items-center justify-center min-h-[280px]">
-              {qrModal.qrcode ? (
+              {qrModal.qrcode && typeof qrModal.qrcode === "string" ? (
                 <img
                   src={
                     qrModal.qrcode.startsWith("data:")
