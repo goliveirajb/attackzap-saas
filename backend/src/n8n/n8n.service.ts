@@ -17,24 +17,83 @@ export class N8nService {
 			const res = await fetch(`${this.n8nUrl}/api/v1/credentials`, {
 				headers: { "X-N8N-API-KEY": this.n8nKey },
 			});
-			if (!res.ok) {
-				this.logger.error(`N8N credentials fetch failed: HTTP ${res.status}`);
-				return null;
-			}
+			if (!res.ok) return null;
 			const data = await res.json();
 			const creds = (data.data || data || []) as any[];
-			this.logger.log(`N8N credentials encontradas: ${creds.map((c: any) => `${c.name} (type: ${c.type}, id: ${c.id})`).join(", ")}`);
-			// Busca por tipo exato ou por nome contendo o termo
 			const found = creds.find((c: any) =>
 				c.type === typeName ||
 				c.type?.toLowerCase().includes(typeName.toLowerCase()) ||
 				c.name?.toLowerCase().includes(typeName.toLowerCase().replace("api", "").trim())
 			);
 			return found ? { id: found.id, name: found.name } : null;
-		} catch (err) {
-			this.logger.error(`N8N credentials error: ${err.message}`);
+		} catch {
 			return null;
 		}
+	}
+
+	// Criar credential no N8N se não existir
+	private async ensureEvolutionCredential(): Promise<{ id: string; name: string }> {
+		const existing = await this.getN8nCredentials("evolutionApi");
+		if (existing) return existing;
+
+		this.logger.log("Criando credential Evolution API no N8N...");
+		const res = await fetch(`${this.n8nUrl}/api/v1/credentials`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-N8N-API-KEY": this.n8nKey,
+			},
+			body: JSON.stringify({
+				name: "Evolution API - AttackZap",
+				type: "evolutionApi",
+				data: {
+					serverUrl: this.evolutionUrl,
+					apikey: this.evolutionKey,
+				},
+			}),
+		});
+
+		if (!res.ok) {
+			const err = await res.text();
+			this.logger.error(`Erro ao criar credential Evolution: ${err}`);
+			throw new Error(`Falha ao criar credential Evolution no N8N: ${err}`);
+		}
+
+		const cred = await res.json();
+		this.logger.log(`Credential Evolution criada: ${cred.id}`);
+		return { id: String(cred.id), name: cred.name };
+	}
+
+	private async ensureHeaderAuthCredential(): Promise<{ id: string; name: string }> {
+		const existing = await this.getN8nCredentials("httpHeaderAuth");
+		if (existing) return existing;
+
+		this.logger.log("Criando credential Header Auth no N8N...");
+		const res = await fetch(`${this.n8nUrl}/api/v1/credentials`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-N8N-API-KEY": this.n8nKey,
+			},
+			body: JSON.stringify({
+				name: "Header Auth - AttackZap",
+				type: "httpHeaderAuth",
+				data: {
+					name: "apikey",
+					value: this.evolutionKey,
+				},
+			}),
+		});
+
+		if (!res.ok) {
+			const err = await res.text();
+			this.logger.error(`Erro ao criar credential Header Auth: ${err}`);
+			throw new Error(`Falha ao criar credential Header Auth no N8N: ${err}`);
+		}
+
+		const cred = await res.json();
+		this.logger.log(`Credential Header Auth criada: ${cred.id}`);
+		return { id: String(cred.id), name: cred.name };
 	}
 
 	// Template: Mensagem Programada
@@ -224,16 +283,9 @@ export class N8nService {
 	async createWorkflow(userId: number, instanceId: number, instanceName: string, automationName: string) {
 		const pool = this.db.getPool();
 
-		// Buscar credentials do N8N
-		const evolutionCred = await this.getN8nCredentials("evolutionApi");
-		const headerAuthCred = await this.getN8nCredentials("httpHeaderAuth");
-
-		if (!evolutionCred) {
-			throw new Error("Credencial Evolution API não encontrada no N8N. Configure em: N8N > Credentials > Evolution API");
-		}
-		if (!headerAuthCred) {
-			throw new Error("Credencial Header Auth não encontrada no N8N. Configure em: N8N > Credentials > Header Auth");
-		}
+		// Buscar ou criar credentials no N8N automaticamente
+		const evolutionCred = await this.ensureEvolutionCredential();
+		const headerAuthCred = await this.ensureHeaderAuthCredential();
 
 		// Gerar path unico para o webhook
 		const webhookPath = `msg-prog-${instanceName}-${Date.now()}`;
