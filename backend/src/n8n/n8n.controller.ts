@@ -21,11 +21,15 @@ export class N8nController {
 			body.name,
 		);
 
-		// 2. Conecta webhook da Evolution ao N8N automaticamente
-		await this.n8nService.connectEvolutionWebhook(
-			body.instanceName,
-			result.webhookUrl,
-		);
+		// 2. Conecta webhook da Evolution ao N8N (não bloqueia se falhar)
+		try {
+			await this.n8nService.connectEvolutionWebhook(
+				body.instanceName,
+				result.webhookUrl,
+			);
+		} catch (err) {
+			console.error("Webhook Evolution falhou (não bloqueante):", err.message);
+		}
 
 		return result;
 	}
