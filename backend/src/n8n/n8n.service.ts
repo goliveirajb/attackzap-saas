@@ -144,7 +144,6 @@ export class N8nService {
 					main: [[{ node: "Respond to Webhook1", type: "main", index: 0 }]],
 				},
 			},
-			active: true,
 			settings: { executionOrder: "v1" },
 		};
 	}
