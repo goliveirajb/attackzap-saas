@@ -9,7 +9,28 @@ import {
   FaToggleOff,
   FaPlug,
   FaSpinner,
+  FaUsers,
+  FaClock,
 } from "react-icons/fa";
+
+const FLOW_TYPES = [
+  {
+    value: "scheduled_message",
+    label: "Mensagem Programada",
+    desc: "Envia mensagens automaticas em horarios agendados via cron",
+    icon: FaClock,
+    color: "text-blue-400",
+    bg: "bg-blue-400/10",
+  },
+  {
+    value: "group_fetch",
+    label: "Busca ID de Grupos",
+    desc: "Busca os IDs dos grupos WhatsApp via Evolution API",
+    icon: FaUsers,
+    color: "text-green-400",
+    bg: "bg-green-400/10",
+  },
+];
 
 export default function Automations() {
   const { authFetch } = useAuth();
@@ -22,6 +43,7 @@ export default function Automations() {
   // Form
   const [formName, setFormName] = useState("");
   const [formInstanceId, setFormInstanceId] = useState("");
+  const [formType, setFormType] = useState("scheduled_message");
 
   const load = async () => {
     try {
@@ -44,7 +66,6 @@ export default function Automations() {
     load();
   }, []);
 
-  // Criar automacao: cria workflow N8N + conecta webhook automaticamente
   const handleCreate = async () => {
     if (!formName.trim()) return toast.error("Digite um nome");
     if (!formInstanceId) return toast.error("Selecione uma instancia");
@@ -60,6 +81,7 @@ export default function Automations() {
           instanceId: instance.id,
           instanceName: instance.instance_name,
           name: formName.trim(),
+          type: formType,
         }),
       });
 
@@ -69,15 +91,15 @@ export default function Automations() {
       }
 
       const data = await res.json();
-      toast.success(
-        `Automacao criada! Workflow N8N #${data.workflowId} + Webhook conectado`
-      );
+      const typeLabel = FLOW_TYPES.find((t) => t.value === formType)?.label || formType;
+      toast.success(`Fluxo "${typeLabel}" criado! Workflow N8N #${data.workflowId}`);
       setFormName("");
       setFormInstanceId("");
+      setFormType("scheduled_message");
       setShowCreate(false);
       load();
     } catch (err) {
-      toast.error(err.message || "Erro ao criar automacao");
+      toast.error(err.message || "Erro ao criar fluxo");
     } finally {
       setCreating(false);
     }
@@ -97,15 +119,20 @@ export default function Automations() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Excluir automacao e workflow N8N?")) return;
+    if (!window.confirm("Excluir fluxo e workflow N8N?")) return;
     try {
       await authFetch(`/api/automations/${id}`, { method: "DELETE" });
-      toast.success("Automacao removida");
+      toast.success("Fluxo removido");
       load();
     } catch {
       toast.error("Erro ao remover");
     }
   };
+
+  const getTypeInfo = (type) =>
+    FLOW_TYPES.find((t) => t.value === type) || FLOW_TYPES[0];
+
+  const selectedType = FLOW_TYPES.find((t) => t.value === formType);
 
   return (
     <div>
@@ -115,24 +142,52 @@ export default function Automations() {
           onClick={() => setShowCreate(!showCreate)}
           className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
         >
-          <FaPlus /> Nova Automacao
+          <FaPlus /> Novo Fluxo
         </button>
       </div>
 
-      {/* Criar automacao */}
+      {/* Criar fluxo */}
       {showCreate && (
-        <div className="bg-dark-card border border-dark-border rounded-2xl p-5 mb-6 space-y-3">
-          <p className="text-sm font-bold text-white mb-1">Criar Automacao</p>
-          <p className="text-xs text-gray-400 mb-3">
-            Ao criar, o sistema automaticamente: cria o workflow no N8N, conecta o webhook
-            da Evolution e ativa a automacao.
-          </p>
+        <div className="bg-dark-card border border-dark-border rounded-2xl p-5 mb-6 space-y-4">
+          <p className="text-sm font-bold text-white">Criar Novo Fluxo</p>
+
+          {/* Seletor de tipo */}
+          <div>
+            <p className="text-xs text-gray-400 mb-2">Selecione o tipo de fluxo:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {FLOW_TYPES.map((ft) => {
+                const Icon = ft.icon;
+                const selected = formType === ft.value;
+                return (
+                  <button
+                    key={ft.value}
+                    onClick={() => setFormType(ft.value)}
+                    className={`text-left rounded-xl border p-4 transition ${
+                      selected
+                        ? "border-primary bg-primary/5"
+                        : "border-dark-border bg-dark-cardSoft hover:border-gray-600"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className={`h-8 w-8 rounded-lg ${ft.bg} flex items-center justify-center`}>
+                        <Icon className={ft.color} />
+                      </div>
+                      <span className={`text-sm font-bold ${selected ? "text-primary" : "text-white"}`}>
+                        {ft.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">{ft.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <input
             type="text"
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
-            placeholder="Nome da automacao (ex: AutoBot Vendas)"
+            placeholder={`Nome do fluxo (ex: ${selectedType?.value === "group_fetch" ? "Busca Grupos Vendas" : "AutoBot Vendas"})`}
             className="w-full rounded-xl bg-dark-cardSoft border border-dark-border px-4 py-2.5 text-sm text-dark-text placeholder:text-gray-500 focus:outline-none focus:border-primary"
           />
 
@@ -160,7 +215,7 @@ export default function Automations() {
               </>
             ) : (
               <>
-                <FaRobot /> Criar Automacao + Workflow N8N
+                <FaRobot /> Criar Fluxo + Workflow N8N
               </>
             )}
           </button>
@@ -173,77 +228,84 @@ export default function Automations() {
       ) : automations.length === 0 ? (
         <div className="bg-dark-card border border-dark-border rounded-2xl p-12 text-center">
           <FaRobot className="text-5xl text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-400">Nenhuma automacao criada</p>
+          <p className="text-gray-400">Nenhum fluxo criado</p>
           <p className="text-xs text-gray-500 mt-1">
-            Crie uma automacao para gerar o workflow N8N automaticamente
+            Crie um fluxo para gerar o workflow N8N automaticamente
           </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {automations.map((auto) => (
-            <div
-              key={auto.id}
-              className="bg-dark-card border border-dark-border rounded-2xl px-5 py-4"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                      auto.active ? "bg-primary/10" : "bg-gray-700/30"
-                    }`}
-                  >
-                    <FaRobot className={auto.active ? "text-primary" : "text-gray-500"} />
+          {automations.map((auto) => {
+            const typeInfo = getTypeInfo(auto.type);
+            const TypeIcon = typeInfo.icon;
+            return (
+              <div
+                key={auto.id}
+                className="bg-dark-card border border-dark-border rounded-2xl px-5 py-4"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`h-10 w-10 rounded-xl flex items-center justify-center ${
+                        auto.active ? typeInfo.bg : "bg-gray-700/30"
+                      }`}
+                    >
+                      <TypeIcon className={auto.active ? typeInfo.color : "text-gray-500"} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{auto.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {auto.instance_name || "---"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-white">{auto.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {auto.instance_name || "---"} | {auto.type}
-                    </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggle(auto.id, !!auto.active)}
+                      className="p-2 transition"
+                      title={auto.active ? "Desativar" : "Ativar"}
+                    >
+                      {auto.active ? (
+                        <FaToggleOn className="text-xl text-green-400" />
+                      ) : (
+                        <FaToggleOff className="text-xl text-gray-500" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(auto.id)}
+                      className="text-gray-500 hover:text-red-400 p-2 transition"
+                    >
+                      <FaTrash className="text-xs" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggle(auto.id, !!auto.active)}
-                    className="p-2 transition"
-                    title={auto.active ? "Desativar" : "Ativar"}
-                  >
-                    {auto.active ? (
-                      <FaToggleOn className="text-xl text-green-400" />
-                    ) : (
-                      <FaToggleOff className="text-xl text-gray-500" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(auto.id)}
-                    className="text-gray-500 hover:text-red-400 p-2 transition"
-                  >
-                    <FaTrash className="text-xs" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Info do workflow */}
-              {auto.n8n_workflow_id && (
+                {/* Badges */}
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded-md">
-                    N8N #{auto.n8n_workflow_id}
+                  <span className={`inline-flex items-center gap-1 ${typeInfo.bg} ${typeInfo.color} text-[10px] font-bold px-2 py-1 rounded-md`}>
+                    <TypeIcon className="text-[8px]" /> {typeInfo.label}
                   </span>
+                  {auto.n8n_workflow_id && (
+                    <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded-md">
+                      N8N #{auto.n8n_workflow_id}
+                    </span>
+                  )}
                   {auto.n8n_webhook_url && (
                     <span className="inline-flex items-center gap-1 bg-green-400/10 text-green-400 text-[10px] font-bold px-2 py-1 rounded-md">
-                      <FaPlug className="text-[8px]" /> Webhook conectado
+                      <FaPlug className="text-[8px]" /> Webhook
                     </span>
                   )}
                 </div>
-              )}
 
-              {auto.n8n_webhook_url && (
-                <p className="text-[10px] text-gray-500 mt-1.5 font-mono truncate">
-                  {auto.n8n_webhook_url}
-                </p>
-              )}
-            </div>
-          ))}
+                {auto.n8n_webhook_url && (
+                  <p className="text-[10px] text-gray-500 mt-1.5 font-mono truncate">
+                    {auto.n8n_webhook_url}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

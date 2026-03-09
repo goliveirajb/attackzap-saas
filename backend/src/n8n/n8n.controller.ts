@@ -11,14 +11,17 @@ export class N8nController {
 	@Post("create")
 	async create(
 		@Req() req,
-		@Body() body: { instanceId: number; instanceName: string; name: string },
+		@Body() body: { instanceId: number; instanceName: string; name: string; type?: string },
 	) {
+		const flowType = (body.type === "group_fetch" ? "group_fetch" : "scheduled_message") as "scheduled_message" | "group_fetch";
+
 		// 1. Cria workflow no N8N
 		const result = await this.n8nService.createWorkflow(
 			req.user.id,
 			body.instanceId,
 			body.instanceName,
 			body.name,
+			flowType,
 		);
 
 		// 2. Conecta webhook da Evolution ao N8N (não bloqueia se falhar)

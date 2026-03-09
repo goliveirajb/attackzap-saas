@@ -70,7 +70,7 @@ export class DatabaseService implements OnModuleInit {
 				user_id INT NOT NULL,
 				instance_id INT NOT NULL,
 				name VARCHAR(255) NOT NULL,
-				type ENUM('scheduled_message','auto_reply','webhook_forward') DEFAULT 'scheduled_message',
+				type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message',
 				config JSON DEFAULT NULL,
 				n8n_workflow_id VARCHAR(100) DEFAULT NULL,
 				n8n_webhook_url VARCHAR(500) DEFAULT NULL,
@@ -99,6 +99,11 @@ export class DatabaseService implements OnModuleInit {
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			)
 		`);
+
+		// Migrations - adicionar novos tipos ao ENUM
+		await pool.query(`
+			ALTER TABLE automations MODIFY COLUMN type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message'
+		`).catch(() => {});
 
 		this.logger.log("Tables verified.");
 	}

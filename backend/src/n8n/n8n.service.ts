@@ -148,15 +148,86 @@ export class N8nService {
 		};
 	}
 
+	// Template: Busca de Grupos WhatsApp
+	private buildBuscaGruposWorkflow(webhookPath: string, instanceName: string) {
+		return {
+			name: `Busca-Grupos - ${instanceName}`,
+			nodes: [
+				{
+					parameters: {
+						httpMethod: "POST",
+						path: webhookPath,
+						responseMode: "responseNode",
+						options: {},
+					},
+					type: "n8n-nodes-base.webhook",
+					typeVersion: 2,
+					position: [-1392, 704],
+					id: `wh-${Date.now()}`,
+					name: "Webhook",
+					webhookId: webhookPath,
+				},
+				{
+					parameters: {
+						method: "GET",
+						url: `${this.evolutionUrl}/group/fetchAllGroups/${instanceName}`,
+						sendHeaders: true,
+						headerParameters: {
+							parameters: [
+								{ name: "Content-Type", value: "application/json" },
+								{ name: "apikey", value: this.evolutionKey },
+							],
+						},
+						options: {},
+					},
+					type: "n8n-nodes-base.httpRequest",
+					typeVersion: 4.2,
+					position: [-1136, 704],
+					id: `fetch-${Date.now()}`,
+					name: "Buscar Grupos",
+				},
+				{
+					parameters: {
+						respondWith: "allIncomingItems",
+						options: {},
+					},
+					type: "n8n-nodes-base.respondToWebhook",
+					typeVersion: 1.4,
+					position: [-880, 704],
+					id: `rsp-${Date.now()}`,
+					name: "Retornar Grupos",
+				},
+			],
+			connections: {
+				Webhook: {
+					main: [[{ node: "Buscar Grupos", type: "main", index: 0 }]],
+				},
+				"Buscar Grupos": {
+					main: [[{ node: "Retornar Grupos", type: "main", index: 0 }]],
+				},
+			},
+			settings: { executionOrder: "v1" },
+		};
+	}
+
 	// Criar workflow no N8N automaticamente
-	async createWorkflow(userId: number, instanceId: number, instanceName: string, automationName: string) {
+	async createWorkflow(
+		userId: number,
+		instanceId: number,
+		instanceName: string,
+		automationName: string,
+		type: "scheduled_message" | "group_fetch" = "scheduled_message",
+	) {
 		const pool = this.db.getPool();
 
-		const webhookPath = `msg-prog-${instanceName}-${Date.now()}`;
+		const prefix = type === "group_fetch" ? "busca-grupos" : "msg-prog";
+		const webhookPath = `${prefix}-${instanceName}-${Date.now()}`;
 
-		const workflow = this.buildMensagemProgramadaWorkflow(webhookPath, instanceName);
+		const workflow = type === "group_fetch"
+			? this.buildBuscaGruposWorkflow(webhookPath, instanceName)
+			: this.buildMensagemProgramadaWorkflow(webhookPath, instanceName);
 
-		this.logger.log(`Criando workflow N8N para ${instanceName}...`);
+		this.logger.log(`Criando workflow N8N [${type}] para ${instanceName}...`);
 
 		const res = await fetch(`${this.n8nUrl}/api/v1/workflows`, {
 			method: "POST",
@@ -186,14 +257,14 @@ export class N8nService {
 
 		const [result] = await pool.query(
 			`INSERT INTO automations (user_id, instance_id, name, type, n8n_workflow_id, n8n_webhook_url, config, active)
-			 VALUES (?, ?, ?, 'scheduled_message', ?, ?, ?, 1)`,
-			[userId, instanceId, automationName, workflowId, webhookUrl, JSON.stringify({ webhookPath, instanceName })],
+			 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+			[userId, instanceId, automationName, type, workflowId, webhookUrl, JSON.stringify({ webhookPath, instanceName })],
 		);
 
 		const automationId = (result as any).insertId;
-		this.logger.log(`Workflow criado: ${workflowId} | Webhook: ${webhookUrl}`);
+		this.logger.log(`Workflow criado [${type}]: ${workflowId} | Webhook: ${webhookUrl}`);
 
-		return { id: automationId, workflowId, webhookUrl, webhookPath };
+		return { id: automationId, workflowId, webhookUrl, webhookPath, type };
 	}
 
 	// Conectar webhook da Evolution ao N8N
