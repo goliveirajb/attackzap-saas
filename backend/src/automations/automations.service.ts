@@ -214,7 +214,7 @@ export class AutomationsService implements OnModuleInit {
 					caption: msg.media_base64 ? descricao : "",
 				};
 
-				this.logger.log(`Enviando #${msg.id} ${msg.media_base64 ? "IMAGEM" : "TEXTO"} para ${number}`);
+				this.logger.log(`Enviando #${msg.id} ${msg.media_base64 ? "IMAGEM" : "TEXTO"} para ${number} -> ${msg.n8n_webhook_url}`);
 
 				const response = await fetch(msg.n8n_webhook_url, {
 					method: "POST",
@@ -223,7 +223,8 @@ export class AutomationsService implements OnModuleInit {
 					signal: AbortSignal.timeout(30000),
 				});
 
-				this.logger.log(`Mensagem #${msg.id} enviada para ${number}. Status: ${response.status}`);
+				const responseText = await response.text().catch(() => "");
+				this.logger.log(`Mensagem #${msg.id} -> ${number} | Status: ${response.status} | Resp: ${responseText.substring(0, 200)}`);
 			} catch (err) {
 				this.logger.error(`Erro ao enviar #${msg.id} para ${number}: ${err.message}`);
 			}

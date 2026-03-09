@@ -34,10 +34,10 @@ export class N8nService {
 					parameters: {
 						assignments: {
 							assignments: [
-								{ id: "f1", name: "number", value: "={{ $json.body.number || '' }}", type: "string" },
-								{ id: "f2", name: "text", value: "={{ $json.body.text || '' }}", type: "string" },
-								{ id: "f3", name: "caption", value: "={{ $json.body.caption || '' }}", type: "string" },
-								{ id: "f4", name: "media", value: "={{ $json.body.media || '' }}", type: "string" },
+								{ id: "f1", name: "number", value: "={{ ($json.body && $json.body.number) || $json.number || '' }}", type: "string" },
+								{ id: "f2", name: "text", value: "={{ ($json.body && $json.body.text) || $json.text || '' }}", type: "string" },
+								{ id: "f3", name: "caption", value: "={{ ($json.body && $json.body.caption) || $json.caption || '' }}", type: "string" },
+								{ id: "f4", name: "media", value: "={{ ($json.body && $json.body.media) || $json.media || '' }}", type: "string" },
 							],
 						},
 						options: {},
@@ -82,7 +82,7 @@ export class N8nService {
 						},
 						sendBody: true,
 						specifyBody: "json",
-						jsonBody: `={{\n  JSON.stringify({\n    number: $json.number,\n    mediatype: "image",\n    media: ($json.media || '').replace(/^data:[^,]+,/, ''),\n    caption: $json.caption || '',\n    fileName: "image.jpg"\n  })\n}}`,
+						jsonBody: `={{ JSON.stringify({ number: $json.number, mediatype: "image", media: ($json.media || "").replace(/^data:[^,]+,/, ""), caption: $json.caption || "", fileName: "image.jpg" }) }}`,
 					},
 					type: "n8n-nodes-base.httpRequest",
 					typeVersion: 4.2,
@@ -103,7 +103,7 @@ export class N8nService {
 						},
 						sendBody: true,
 						specifyBody: "json",
-						jsonBody: `={{\n  JSON.stringify({\n    number: $json.number,\n    text: $json.text\n  })\n}}`,
+						jsonBody: `={{ JSON.stringify({ number: $json.number, text: $json.text }) }}`,
 					},
 					type: "n8n-nodes-base.httpRequest",
 					typeVersion: 4.2,
