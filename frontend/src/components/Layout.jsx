@@ -1,12 +1,42 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { FaWhatsapp, FaRobot, FaHome, FaSignOutAlt, FaClock } from "react-icons/fa";
+import {
+  FaHome,
+  FaWhatsapp,
+  FaProjectDiagram,
+  FaClock,
+  FaUsers,
+  FaCog,
+  FaSignOutAlt,
+} from "react-icons/fa";
 
-const links = [
-  { to: "/", label: "Dashboard", icon: FaHome },
-  { to: "/instances", label: "WhatsApp", icon: FaWhatsapp },
-  { to: "/automations", label: "Automacoes", icon: FaRobot },
-  { to: "/scheduled-messages", label: "Msg Programadas", icon: FaClock },
+const menuSections = [
+  {
+    label: "GERAL",
+    links: [
+      { to: "/", label: "Dashboard", icon: FaHome },
+    ],
+  },
+  {
+    label: "WHATSAPP",
+    links: [
+      { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
+      { to: "/groups", label: "Grupos", icon: FaUsers },
+    ],
+  },
+  {
+    label: "AUTOMACOES",
+    links: [
+      { to: "/flows", label: "Fluxos", icon: FaProjectDiagram },
+      { to: "/scheduled-messages", label: "Msg Programadas", icon: FaClock },
+    ],
+  },
+  {
+    label: "SISTEMA",
+    links: [
+      { to: "/settings", label: "Configuracoes", icon: FaCog },
+    ],
+  },
 ];
 
 export default function Layout() {
@@ -26,26 +56,35 @@ export default function Layout() {
           <h1 className="text-xl font-extrabold text-primary tracking-wider">
             ATTACKZAP
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">SaaS WhatsApp</p>
+          <p className="text-xs text-gray-400 mt-0.5">CRM WhatsApp</p>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === "/"}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  isActive
-                    ? "bg-primary text-white shadow-md"
-                    : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
-                }`
-              }
-            >
-              <link.icon className="text-base" />
-              {link.label}
-            </NavLink>
+        <nav className="flex-1 p-3 overflow-y-auto">
+          {menuSections.map((section) => (
+            <div key={section.label} className="mb-4">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4 mb-2">
+                {section.label}
+              </p>
+              <div className="space-y-0.5">
+                {section.links.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    end={link.to === "/"}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                        isActive
+                          ? "bg-primary text-white shadow-md"
+                          : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
+                      }`
+                    }
+                  >
+                    <link.icon className="text-base" />
+                    {link.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 

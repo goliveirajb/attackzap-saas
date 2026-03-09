@@ -40,6 +40,11 @@ export class WhatsappController {
 		return this.whatsappService.sendText(name, body.number, body.text);
 	}
 
+	@Get("instances/:name/groups")
+	async groups(@Param("name") name: string) {
+		return this.whatsappService.getGroups(name);
+	}
+
 	@Delete("instances/:id/:name")
 	async remove(@Param("id") id: string, @Param("name") name: string) {
 		return this.whatsappService.deleteInstance(Number(id), name);

@@ -205,6 +205,31 @@ export class WhatsappService {
 		return await res.json();
 	}
 
+	// Buscar grupos da instancia via Evolution API
+	async getGroups(instanceName: string) {
+		const res = await fetch(
+			`${this.evolutionUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`,
+			{
+				method: "GET",
+				headers: { apikey: this.evolutionKey },
+			},
+		);
+
+		if (!res.ok) {
+			const err = await res.text();
+			this.logger.error(`Evolution groups error: ${err}`);
+			throw new Error("Falha ao buscar grupos");
+		}
+
+		const data = await res.json();
+		// Evolution retorna array de grupos com id, subject, size, etc
+		return (Array.isArray(data) ? data : data?.data || data || []).map((g: any) => ({
+			id: g.id || g.jid,
+			name: g.subject || g.name || g.id,
+			size: g.size || g.participants?.length || 0,
+		}));
+	}
+
 	// Listar instancias do usuario
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();

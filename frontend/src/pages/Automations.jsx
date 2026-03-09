@@ -110,7 +110,7 @@ export default function Automations() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-white">Automacoes</h2>
+        <h2 className="text-2xl font-bold text-white">Fluxos N8N</h2>
         <button
           onClick={() => setShowCreate(!showCreate)}
           className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition"
