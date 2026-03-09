@@ -1,11 +1,12 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { FaWhatsapp, FaRobot, FaHome, FaSignOutAlt } from "react-icons/fa";
+import { FaWhatsapp, FaRobot, FaHome, FaSignOutAlt, FaClock } from "react-icons/fa";
 
 const links = [
   { to: "/", label: "Dashboard", icon: FaHome },
   { to: "/instances", label: "WhatsApp", icon: FaWhatsapp },
   { to: "/automations", label: "Automacoes", icon: FaRobot },
+  { to: "/scheduled-messages", label: "Msg Programadas", icon: FaClock },
 ];
 
 export default function Layout() {

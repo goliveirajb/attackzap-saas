@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Instances from "./pages/Instances";
 import Automations from "./pages/Automations";
+import ScheduledMessages from "./pages/ScheduledMessages";
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
@@ -26,6 +27,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="instances" element={<Instances />} />
         <Route path="automations" element={<Automations />} />
+        <Route path="scheduled-messages" element={<ScheduledMessages />} />
       </Route>
     </Routes>
   );
