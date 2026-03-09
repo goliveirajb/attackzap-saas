@@ -21,7 +21,6 @@ services:
       - PORT=3001
     networks:
       - attackzap
-      - loterias-bet-network
 
   frontend:
     build: ./frontend
@@ -37,5 +36,3 @@ services:
 networks:
   attackzap:
     driver: bridge
-  loterias-bet-network:
-    external: true
