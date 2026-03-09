@@ -16,8 +16,16 @@ if ! command -v docker-compose &> /dev/null; then
     apt install -y docker-compose
 fi
 
-# 2. Criar banco de dados na AWS RDS
-echo "[2/4] Criando banco attackzap_saas na AWS RDS..."
+# 2. Criar .env a partir do .env.example se nao existir
+if [ ! -f .env ]; then
+    echo "[2/5] Criando .env a partir do .env.example..."
+    cp .env.example .env
+else
+    echo "[2/5] .env já existe."
+fi
+
+# 3. Criar banco de dados na AWS RDS
+echo "[3/5] Criando banco attackzap_saas na AWS RDS..."
 docker run --rm mysql:8 mysql \
   -h database-1.c5yjijbhddcp.us-east-1.rds.amazonaws.com \
   -u root \
@@ -26,11 +34,11 @@ docker run --rm mysql:8 mysql \
 echo "       Banco criado!"
 
 # 3. Build e start dos containers
-echo "[3/4] Construindo e iniciando containers..."
+echo "[4/5] Construindo e iniciando containers..."
 docker-compose up -d --build
 
 # 4. Verificar
-echo "[4/4] Verificando status..."
+echo "[5/5] Verificando status..."
 sleep 5
 docker-compose ps
 
