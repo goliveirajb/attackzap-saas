@@ -17,12 +17,22 @@ export class N8nService {
 			const res = await fetch(`${this.n8nUrl}/api/v1/credentials`, {
 				headers: { "X-N8N-API-KEY": this.n8nKey },
 			});
-			if (!res.ok) return null;
+			if (!res.ok) {
+				this.logger.error(`N8N credentials fetch failed: HTTP ${res.status}`);
+				return null;
+			}
 			const data = await res.json();
 			const creds = (data.data || data || []) as any[];
-			const found = creds.find((c: any) => c.type === typeName);
+			this.logger.log(`N8N credentials encontradas: ${creds.map((c: any) => `${c.name} (type: ${c.type}, id: ${c.id})`).join(", ")}`);
+			// Busca por tipo exato ou por nome contendo o termo
+			const found = creds.find((c: any) =>
+				c.type === typeName ||
+				c.type?.toLowerCase().includes(typeName.toLowerCase()) ||
+				c.name?.toLowerCase().includes(typeName.toLowerCase().replace("api", "").trim())
+			);
 			return found ? { id: found.id, name: found.name } : null;
-		} catch {
+		} catch (err) {
+			this.logger.error(`N8N credentials error: ${err.message}`);
 			return null;
 		}
 	}
