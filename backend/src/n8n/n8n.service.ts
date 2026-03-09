@@ -114,6 +114,7 @@ export class N8nService {
 			headers: {
 				"Content-Type": "application/json",
 				"X-N8N-API-KEY": this.n8nKey,
+				Authorization: `Bearer ${this.n8nKey}`,
 			},
 			body: JSON.stringify(workflow),
 		});
