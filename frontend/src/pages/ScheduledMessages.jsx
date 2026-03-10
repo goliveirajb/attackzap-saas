@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import {
@@ -8,43 +8,62 @@ import {
   FaToggleOn,
   FaToggleOff,
   FaImage,
-  FaEdit,
-  FaSave,
-  FaTimes,
+  FaUpload,
   FaSpinner,
+  FaCalendarDay,
+  FaPen,
+  FaTimes,
 } from "react-icons/fa";
 
-const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+const DIAS_SEMANA = [
+  { value: 0, label: "Dom", full: "Domingo" },
+  { value: 1, label: "Seg", full: "Segunda" },
+  { value: 2, label: "Ter", full: "Terca" },
+  { value: 3, label: "Qua", full: "Quarta" },
+  { value: 4, label: "Qui", full: "Quinta" },
+  { value: 5, label: "Sex", full: "Sexta" },
+  { value: 6, label: "Sab", full: "Sabado" },
+];
 
-// Pode ser usado standalone (sem props) ou embutido em Automations (com automationId)
+const parseDias = (diasStr) => {
+  if (!diasStr) return [0, 1, 2, 3, 4, 5, 6];
+  return diasStr.split(",").map(Number).filter((n) => !isNaN(n));
+};
+
+const getDiaHoje = () => new Date().getDay();
+
+const formatHorario = (h) => {
+  if (!h) return "-";
+  const parts = String(h).split(":");
+  return `${parts[0]}:${parts[1]}`;
+};
+
 export default function ScheduledMessages({ automationId = null }) {
   const { authFetch } = useAuth();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const fileRef = useRef(null);
-  const [uploadingId, setUploadingId] = useState(null);
+  const [filtroDia, setFiltroDia] = useState(getDiaHoje());
 
-  // Form create
+  // Modal criar
+  const [modalCriar, setModalCriar] = useState(false);
+  const [criando, setCriando] = useState(false);
   const [formHorario, setFormHorario] = useState("08:00");
   const [formText, setFormText] = useState("");
   const [formNumbers, setFormNumbers] = useState("");
   const [formDias, setFormDias] = useState([0, 1, 2, 3, 4, 5, 6]);
 
-  // Form edit
-  const [editHorario, setEditHorario] = useState("");
-  const [editText, setEditText] = useState("");
-  const [editNumbers, setEditNumbers] = useState("");
+  // Modal editar dias
+  const [editDiasId, setEditDiasId] = useState(null);
   const [editDias, setEditDias] = useState([]);
+
+  // Preview imagem
+  const [previewImagem, setPreviewImagem] = useState(null);
 
   const load = async () => {
     try {
       const res = await authFetch("/api/scheduled-messages");
       const data = await res.json();
       let msgs = Array.isArray(data) ? data : [];
-      // Filtrar por automationId se fornecido
       if (automationId) {
         msgs = msgs.filter((m) => m.automation_id === automationId);
       }
@@ -58,24 +77,41 @@ export default function ScheduledMessages({ automationId = null }) {
 
   useEffect(() => { load(); }, [automationId]);
 
-  const toggleDia = (dia, list, setter) => {
-    setter(list.includes(dia) ? list.filter((d) => d !== dia) : [...list, dia].sort());
+  // Filtrar por dia
+  const msgFiltradas = useMemo(() => {
+    if (filtroDia === -1) return messages;
+    return messages.filter((msg) => parseDias(msg.dias_semana).includes(filtroDia));
+  }, [messages, filtroDia]);
+
+  // Contagem por dia
+  const contagemPorDia = useMemo(() => {
+    const counts = {};
+    DIAS_SEMANA.forEach((d) => { counts[d.value] = 0; });
+    messages.forEach((msg) => {
+      parseDias(msg.dias_semana).forEach((d) => { if (counts[d] !== undefined) counts[d]++; });
+    });
+    return counts;
+  }, [messages]);
+
+  const toggleDia = (_arr, setArr, dia) => {
+    setArr((prev) => prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]);
   };
 
   const handleCreate = async () => {
     if (!formHorario) return toast.error("Defina o horario");
+    if (formDias.length === 0) return toast.error("Selecione pelo menos um dia");
     if (!formNumbers.trim()) return toast.error("Informe os numeros");
 
-    setCreating(true);
+    setCriando(true);
     try {
       const res = await authFetch("/api/scheduled-messages", {
         method: "POST",
         body: JSON.stringify({
-          automationId: automationId,
+          automationId,
           horario: formHorario + ":00",
           messageText: formText,
           targetNumbers: formNumbers.trim(),
-          diasSemana: formDias.join(","),
+          diasSemana: formDias.sort((a, b) => a - b).join(","),
         }),
       });
       if (!res.ok) throw new Error();
@@ -84,49 +120,22 @@ export default function ScheduledMessages({ automationId = null }) {
       setFormNumbers("");
       setFormHorario("08:00");
       setFormDias([0, 1, 2, 3, 4, 5, 6]);
-      setShowCreate(false);
+      setModalCriar(false);
       load();
     } catch {
       toast.error("Erro ao criar mensagem");
     } finally {
-      setCreating(false);
+      setCriando(false);
     }
   };
 
-  const startEdit = (msg) => {
-    setEditingId(msg.id);
-    setEditHorario(String(msg.horario).slice(0, 5));
-    setEditText(msg.message_text || "");
-    setEditNumbers(msg.target_numbers || "");
-    setEditDias((msg.dias_semana || "0,1,2,3,4,5,6").split(",").map(Number));
-  };
-
-  const handleSaveEdit = async () => {
+  const handleToggle = async (msg) => {
     try {
-      await authFetch(`/api/scheduled-messages/${editingId}`, {
+      await authFetch(`/api/scheduled-messages/${msg.id}`, {
         method: "PUT",
-        body: JSON.stringify({
-          horario: editHorario + ":00",
-          message_text: editText,
-          target_numbers: editNumbers,
-          dias_semana: editDias.join(","),
-        }),
+        body: JSON.stringify({ active: msg.active ? 0 : 1 }),
       });
-      toast.success("Atualizado!");
-      setEditingId(null);
-      load();
-    } catch {
-      toast.error("Erro ao atualizar");
-    }
-  };
-
-  const handleToggle = async (id, active) => {
-    try {
-      await authFetch(`/api/scheduled-messages/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ active: active ? 0 : 1 }),
-      });
-      toast.success(active ? "Desativada" : "Ativada");
+      toast.success(msg.active ? "Desativada" : "Ativada");
       load();
     } catch {
       toast.error("Erro ao alterar");
@@ -144,26 +153,28 @@ export default function ScheduledMessages({ automationId = null }) {
     }
   };
 
-  const handleUpload = async (id, file) => {
-    setUploadingId(id);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result.split(",")[1];
-        const res = await authFetch(`/api/scheduled-messages/${id}/upload`, {
-          method: "POST",
-          body: JSON.stringify({ base64, filename: file.name }),
-        });
-        if (!res.ok) throw new Error();
-        toast.success("Imagem salva!");
-        load();
-      } catch {
-        toast.error("Erro no upload");
-      } finally {
-        setUploadingId(null);
-      }
-    };
-    reader.readAsDataURL(file);
+  const uploadImagem = async (id, file) => {
+    const toastId = toast.loading("Enviando imagem...");
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await authFetch(`/api/scheduled-messages/${id}/upload`, {
+        method: "POST",
+        body: JSON.stringify({ base64, filename: file.name }),
+      });
+      toast.dismiss(toastId);
+      if (!res.ok) throw new Error();
+      toast.success("Imagem enviada!");
+      load();
+    } catch {
+      toast.dismiss(toastId);
+      toast.error("Erro ao enviar imagem");
+    }
   };
 
   const handleRemoveImage = async (id) => {
@@ -176,212 +187,378 @@ export default function ScheduledMessages({ automationId = null }) {
     }
   };
 
+  const salvarDias = async () => {
+    if (!editDiasId || editDias.length === 0) {
+      toast.error("Selecione pelo menos um dia");
+      return;
+    }
+    try {
+      await authFetch(`/api/scheduled-messages/${editDiasId}`, {
+        method: "PUT",
+        body: JSON.stringify({ dias_semana: editDias.sort((a, b) => a - b).join(",") }),
+      });
+      toast.success("Dias atualizados!");
+      setEditDiasId(null);
+      load();
+    } catch {
+      toast.error("Erro ao atualizar dias");
+    }
+  };
+
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-bold text-white">Mensagens Programadas</p>
+        <div>
+          <p className="text-sm font-bold text-white">Mensagens Programadas</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            Configure horarios para envio automatico. Filtre por dia da semana.
+          </p>
+        </div>
         <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-xs font-semibold px-3 py-2 rounded-lg transition"
+          onClick={() => setModalCriar(true)}
+          className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-xs font-medium px-4 py-2 rounded-lg transition"
         >
-          <FaPlus className="text-[10px]" /> Nova Mensagem
+          <FaPlus size={10} /> Novo Horario
         </button>
       </div>
 
-      {/* Criar */}
-      {showCreate && (
-        <div className="bg-dark-cardSoft border border-dark-border rounded-xl p-4 mb-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">Horario (Brasilia)</label>
-              <input
-                type="time"
-                value={formHorario}
-                onChange={(e) => setFormHorario(e.target.value)}
-                className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">Dias da semana</label>
-              <div className="flex gap-1 flex-wrap">
-                {DIAS.map((d, i) => (
-                  <button
-                    key={i}
-                    onClick={() => toggleDia(i, formDias, setFormDias)}
-                    className={`px-2 py-1 text-[10px] font-bold rounded-lg transition ${
-                      formDias.includes(i)
-                        ? "bg-primary text-white"
-                        : "bg-dark-card text-gray-500 border border-dark-border"
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <input
-            type="text"
-            value={formNumbers}
-            onChange={(e) => setFormNumbers(e.target.value)}
-            placeholder="Numeros WhatsApp (ex: 5511999999999,5511888888888)"
-            className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text placeholder:text-gray-500 focus:outline-none focus:border-primary"
-          />
-
-          <textarea
-            value={formText}
-            onChange={(e) => setFormText(e.target.value)}
-            placeholder="Texto da mensagem..."
-            rows={3}
-            className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text placeholder:text-gray-500 focus:outline-none focus:border-primary resize-none"
-          />
-
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition disabled:opacity-50"
-          >
-            {creating ? <><FaSpinner className="animate-spin" /> Criando...</> : <><FaClock /> Criar Mensagem</>}
-          </button>
+      {/* Filtro por dia */}
+      <div className="bg-dark-cardSoft border border-dark-border rounded-xl p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <FaCalendarDay className="text-primary text-sm" />
+          <span className="text-xs font-medium text-gray-300">Filtrar por dia</span>
         </div>
-      )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFiltroDia(-1)}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              filtroDia === -1
+                ? "bg-primary text-white shadow-md"
+                : "bg-dark-card text-gray-400 hover:bg-dark-card/80"
+            }`}
+          >
+            Todos ({messages.length})
+          </button>
+          {DIAS_SEMANA.map((dia) => {
+            const isHoje = dia.value === getDiaHoje();
+            const isActive = filtroDia === dia.value;
+            return (
+              <button
+                key={dia.value}
+                onClick={() => setFiltroDia(dia.value)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium transition-all relative ${
+                  isActive
+                    ? "bg-primary text-white shadow-md"
+                    : isHoje
+                    ? "bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
+                    : "bg-dark-card text-gray-400 hover:bg-dark-card/80"
+                }`}
+              >
+                {dia.label}
+                <span className={`ml-1 ${isActive ? "text-white/70" : "text-gray-500"}`}>
+                  {contagemPorDia[dia.value]}
+                </span>
+                {isHoje && !isActive && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Lista */}
+      {/* Lista em grid */}
       {loading ? (
-        <p className="text-gray-400 text-xs">Carregando...</p>
-      ) : messages.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <FaSpinner className="animate-spin text-primary mr-2" />
+          <span className="text-sm text-gray-400">Carregando...</span>
+        </div>
+      ) : msgFiltradas.length === 0 ? (
         <div className="bg-dark-cardSoft border border-dark-border rounded-xl p-8 text-center">
-          <FaClock className="text-3xl text-gray-600 mx-auto mb-2" />
-          <p className="text-xs text-gray-400">Nenhuma mensagem programada</p>
-          <p className="text-[10px] text-gray-500 mt-1">Clique em "Nova Mensagem" para criar</p>
+          <FaClock className="text-4xl text-gray-600 mx-auto mb-3" />
+          <p className="text-sm text-gray-400">
+            {messages.length === 0
+              ? "Nenhum horario programado."
+              : `Nenhum horario para ${filtroDia === -1 ? "este filtro" : DIAS_SEMANA.find((d) => d.value === filtroDia)?.full}.`}
+          </p>
+          <p className="text-[10px] text-gray-500 mt-1">Clique em "Novo Horario" para criar.</p>
         </div>
       ) : (
-        <div className="grid gap-2">
-          {messages.map((msg) => {
-            const isEditing = editingId === msg.id;
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {msgFiltradas.map((msg) => {
+            const diasMsg = parseDias(msg.dias_semana);
             return (
-              <div key={msg.id} className="bg-dark-cardSoft border border-dark-border rounded-xl px-4 py-3">
-                {isEditing ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-400 mb-1 block">Horario</label>
-                        <input
-                          type="time"
-                          value={editHorario}
-                          onChange={(e) => setEditHorario(e.target.value)}
-                          className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 mb-1 block">Dias</label>
-                        <div className="flex gap-1 flex-wrap">
-                          {DIAS.map((d, i) => (
-                            <button
-                              key={i}
-                              onClick={() => toggleDia(i, editDias, setEditDias)}
-                              className={`px-2 py-1 text-[10px] font-bold rounded-lg transition ${
-                                editDias.includes(i)
-                                  ? "bg-primary text-white"
-                                  : "bg-dark-card text-gray-500 border border-dark-border"
-                              }`}
-                            >
-                              {d}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <input
-                      type="text"
-                      value={editNumbers}
-                      onChange={(e) => setEditNumbers(e.target.value)}
-                      placeholder="Numeros..."
-                      className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary"
-                    />
-                    <textarea
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      rows={2}
-                      className="w-full rounded-lg bg-dark-card border border-dark-border px-3 py-2 text-sm text-dark-text focus:outline-none focus:border-primary resize-none"
-                    />
-                    <div className="flex gap-2">
-                      <button onClick={handleSaveEdit} className="flex items-center gap-1 bg-green-600 text-white text-xs font-semibold px-3 py-2 rounded-lg"><FaSave /> Salvar</button>
-                      <button onClick={() => setEditingId(null)} className="flex items-center gap-1 bg-gray-700 text-gray-300 text-xs font-semibold px-3 py-2 rounded-lg"><FaTimes /> Cancelar</button>
-                    </div>
+              <div
+                key={msg.id}
+                className={`bg-dark-card rounded-xl border overflow-hidden transition-all ${
+                  msg.active ? "border-primary/30" : "border-dark-border opacity-60"
+                }`}
+              >
+                {/* Header do card */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-dark-border">
+                  <div className="flex items-center gap-2">
+                    <FaClock className={msg.active ? "text-primary" : "text-gray-500"} />
+                    <span className="text-lg font-bold text-white">{formatHorario(msg.horario)}</span>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${msg.active ? "bg-blue-400/10" : "bg-gray-700/30"}`}>
-                          <FaClock className={`text-sm ${msg.active ? "text-blue-400" : "text-gray-500"}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-white">
-                            {String(msg.horario).slice(0, 5)}
-                            <span className="text-[10px] text-gray-400 font-normal ml-2">
-                              {(msg.dias_semana || "0,1,2,3,4,5,6").split(",").map((d) => DIAS[Number(d)]).join(", ")}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => startEdit(msg)} className="text-gray-500 hover:text-primary p-1.5 transition" title="Editar"><FaEdit className="text-xs" /></button>
-                        <button onClick={() => handleToggle(msg.id, !!msg.active)} className="p-1.5 transition" title={msg.active ? "Desativar" : "Ativar"}>
-                          {msg.active ? <FaToggleOn className="text-lg text-green-400" /> : <FaToggleOff className="text-lg text-gray-500" />}
-                        </button>
-                        <button onClick={() => handleDelete(msg.id)} className="text-gray-500 hover:text-red-400 p-1.5 transition"><FaTrash className="text-xs" /></button>
-                      </div>
-                    </div>
-
-                    {msg.message_text && (
-                      <p className="text-xs text-gray-300 bg-dark-card rounded-lg px-3 py-2 mb-2">{msg.message_text}</p>
-                    )}
-
-                    <p className="text-[10px] text-gray-500 font-mono mb-2">
-                      Para: {msg.target_numbers}
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      {msg.media_base64 ? (
-                        <div className="flex items-center gap-2">
-                          <img src={msg.media_base64} alt="" className="h-10 w-10 rounded-lg object-cover border border-dark-border" />
-                          <button onClick={() => handleRemoveImage(msg.id)} className="text-[10px] text-red-400 hover:underline">
-                            Remover imagem
-                          </button>
-                        </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleToggle(msg)} title={msg.active ? "Desativar" : "Ativar"}>
+                      {msg.active ? (
+                        <FaToggleOn className="text-xl text-green-400 hover:text-green-500 transition" />
                       ) : (
-                        <button
-                          onClick={() => { setUploadingId(msg.id); fileRef.current?.click(); }}
-                          className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-primary transition"
-                        >
-                          <FaImage /> {uploadingId === msg.id ? "Enviando..." : "Adicionar imagem"}
-                        </button>
+                        <FaToggleOff className="text-xl text-gray-500 hover:text-gray-400 transition" />
                       )}
+                    </button>
+                    <button onClick={() => handleDelete(msg.id)} className="text-red-400/60 hover:text-red-400 transition" title="Excluir">
+                      <FaTrash size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dias da semana */}
+                <div className="px-4 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-gray-500 uppercase font-medium">Dias</span>
+                    <button
+                      onClick={() => { setEditDiasId(msg.id); setEditDias([...diasMsg]); }}
+                      className="text-gray-500 hover:text-primary transition"
+                      title="Editar dias"
+                    >
+                      <FaPen size={10} />
+                    </button>
+                  </div>
+                  <div className="flex gap-1">
+                    {DIAS_SEMANA.map((dia) => {
+                      const ativo = diasMsg.includes(dia.value);
+                      return (
+                        <span
+                          key={dia.value}
+                          className={`w-8 h-7 flex items-center justify-center rounded text-[10px] font-medium transition-all ${
+                            ativo
+                              ? "bg-primary/10 text-primary border border-primary/30"
+                              : "bg-dark-cardSoft text-gray-600 border border-transparent"
+                          }`}
+                        >
+                          {dia.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Texto / Numeros */}
+                <div className="px-4 pt-2">
+                  {msg.message_text && (
+                    <p className="text-xs text-gray-300 mb-1">{msg.message_text}</p>
+                  )}
+                  <p className="text-[10px] text-gray-500 font-mono truncate">
+                    Para: {msg.target_numbers}
+                  </p>
+                </div>
+
+                {/* Imagem */}
+                <div className="px-4 py-3">
+                  {msg.media_base64 ? (
+                    <div className="relative group">
+                      <img
+                        src={msg.media_base64}
+                        alt={`Imagem ${msg.horario}`}
+                        className="w-full h-40 object-cover rounded-lg border border-dark-border cursor-pointer"
+                        onClick={() => setPreviewImagem(msg.media_base64)}
+                      />
+                      <div className="absolute bottom-2 right-2 flex gap-1">
+                        <label className="px-2 py-1 rounded-lg bg-black/60 text-white text-[10px] cursor-pointer hover:bg-black/80 transition flex items-center gap-1">
+                          <FaUpload size={8} /> Trocar
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => { if (e.target.files[0]) uploadImagem(msg.id, e.target.files[0]); }}
+                          />
+                        </label>
+                        <button
+                          onClick={() => handleRemoveImage(msg.id)}
+                          className="px-2 py-1 rounded-lg bg-red-500/80 text-white text-[10px] hover:bg-red-500 transition flex items-center gap-1"
+                        >
+                          <FaTrash size={8} /> Remover
+                        </button>
+                      </div>
                     </div>
-                  </>
-                )}
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-dark-border rounded-lg cursor-pointer hover:border-primary transition bg-dark-cardSoft/30">
+                      <FaImage className="text-2xl text-gray-600 mb-2" />
+                      <span className="text-[10px] text-gray-500">Clique para enviar imagem</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => { if (e.target.files[0]) uploadImagem(msg.id, e.target.files[0]); }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Status badge */}
+                <div className="px-4 pb-3">
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                    msg.active
+                      ? "bg-green-400/10 text-green-400"
+                      : "bg-dark-cardSoft text-gray-500"
+                  }`}>
+                    {msg.active ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file && uploadingId) handleUpload(uploadingId, file);
-          e.target.value = "";
-        }}
-      />
+      {/* ===== Modal Criar Horario ===== */}
+      {modalCriar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setModalCriar(false)}>
+          <div className="bg-dark-card rounded-2xl shadow-2xl w-full max-w-md p-6 border border-dark-border" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-white mb-4">Novo Horario Programado</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Horario (Brasilia)</label>
+                <input
+                  type="time"
+                  value={formHorario}
+                  onChange={(e) => setFormHorario(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Numeros WhatsApp</label>
+                <input
+                  type="text"
+                  value={formNumbers}
+                  onChange={(e) => setFormNumbers(e.target.value)}
+                  placeholder="5511999999999,5511888888888"
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Texto da mensagem</label>
+                <textarea
+                  value={formText}
+                  onChange={(e) => setFormText(e.target.value)}
+                  placeholder="Texto da mensagem (ou deixe vazio se for enviar apenas imagem)"
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Dias da Semana</label>
+                <div className="flex flex-wrap gap-2">
+                  {DIAS_SEMANA.map((dia) => {
+                    const ativo = formDias.includes(dia.value);
+                    return (
+                      <button
+                        key={dia.value}
+                        type="button"
+                        onClick={() => toggleDia(formDias, setFormDias, dia.value)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                          ativo
+                            ? "bg-primary text-white"
+                            : "bg-dark-cardSoft text-gray-400 hover:bg-dark-cardSoft/80"
+                        }`}
+                      >
+                        {dia.full}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-3 mt-2">
+                  <button type="button" onClick={() => setFormDias([0,1,2,3,4,5,6])} className="text-[10px] text-primary hover:underline">Todos</button>
+                  <button type="button" onClick={() => setFormDias([1,2,3,4,5])} className="text-[10px] text-primary hover:underline">Seg-Sex</button>
+                  <button type="button" onClick={() => setFormDias([0,6])} className="text-[10px] text-primary hover:underline">Fim de Semana</button>
+                  <button type="button" onClick={() => setFormDias([])} className="text-[10px] text-gray-500 hover:underline">Limpar</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setModalCriar(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-dark-cardSoft transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={criando}
+                className="px-6 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primaryLight disabled:opacity-50 transition"
+              >
+                {criando ? "Criando..." : "Criar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Modal Editar Dias ===== */}
+      {editDiasId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setEditDiasId(null)}>
+          <div className="bg-dark-card rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-dark-border" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-white mb-4">Editar Dias da Semana</h2>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {DIAS_SEMANA.map((dia) => {
+                const ativo = editDias.includes(dia.value);
+                return (
+                  <button
+                    key={dia.value}
+                    type="button"
+                    onClick={() => toggleDia(editDias, setEditDias, dia.value)}
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      ativo
+                        ? "bg-primary text-white"
+                        : "bg-dark-cardSoft text-gray-400 hover:bg-dark-cardSoft/80"
+                    }`}
+                  >
+                    {dia.full}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-3 mb-4">
+              <button type="button" onClick={() => setEditDias([0,1,2,3,4,5,6])} className="text-[10px] text-primary hover:underline">Todos</button>
+              <button type="button" onClick={() => setEditDias([1,2,3,4,5])} className="text-[10px] text-primary hover:underline">Seg-Sex</button>
+              <button type="button" onClick={() => setEditDias([0,6])} className="text-[10px] text-primary hover:underline">Fim de Semana</button>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setEditDiasId(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-dark-cardSoft transition">
+                Cancelar
+              </button>
+              <button onClick={salvarDias} className="px-6 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primaryLight transition">
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Modal Preview Imagem ===== */}
+      {previewImagem && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setPreviewImagem(null)}>
+          <div className="relative max-w-3xl max-h-[90vh] p-2" onClick={(e) => e.stopPropagation()}>
+            <img src={previewImagem} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+            <button
+              onClick={() => setPreviewImagem(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition"
+            >
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
