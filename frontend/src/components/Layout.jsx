@@ -4,8 +4,6 @@ import {
   FaHome,
   FaWhatsapp,
   FaProjectDiagram,
-  FaClock,
-  FaUsers,
   FaCog,
   FaSignOutAlt,
 } from "react-icons/fa";
@@ -21,14 +19,12 @@ const menuSections = [
     label: "WHATSAPP",
     links: [
       { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
-      { to: "/groups", label: "Grupos", icon: FaUsers },
     ],
   },
   {
     label: "AUTOMACOES",
     links: [
       { to: "/flows", label: "Fluxos", icon: FaProjectDiagram },
-      { to: "/scheduled-messages", label: "Msg Programadas", icon: FaClock },
     ],
   },
   {

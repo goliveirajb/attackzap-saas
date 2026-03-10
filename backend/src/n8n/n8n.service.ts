@@ -169,12 +169,16 @@ export class N8nService {
 				},
 				{
 					parameters: {
-						method: "GET",
 						url: `${this.evolutionUrl}/group/fetchAllGroups/${instanceName}`,
+						sendQuery: true,
+						queryParameters: {
+							parameters: [
+								{ name: "getParticipants", value: "false" },
+							],
+						},
 						sendHeaders: true,
 						headerParameters: {
 							parameters: [
-								{ name: "Content-Type", value: "application/json" },
 								{ name: "apikey", value: this.evolutionKey },
 							],
 						},
