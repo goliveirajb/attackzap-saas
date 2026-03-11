@@ -100,6 +100,55 @@ export class DatabaseService implements OnModuleInit {
 			)
 		`);
 
+		// CRM tables
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS contacts (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL,
+				instance_id INT DEFAULT NULL,
+				name VARCHAR(255) DEFAULT NULL,
+				phone VARCHAR(30) NOT NULL,
+				email VARCHAR(255) DEFAULT NULL,
+				notes TEXT DEFAULT NULL,
+				tags VARCHAR(500) DEFAULT NULL,
+				stage_id INT DEFAULT NULL,
+				last_message_at TIMESTAMP NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE KEY uq_user_phone (user_id, phone)
+			)
+		`);
+
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS crm_stages (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL,
+				name VARCHAR(255) NOT NULL,
+				color VARCHAR(20) DEFAULT '#0a6fbe',
+				position INT DEFAULT 0,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`);
+
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS contact_messages (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				contact_id INT NOT NULL,
+				user_id INT NOT NULL,
+				direction ENUM('incoming','outgoing') DEFAULT 'incoming',
+				message_text TEXT DEFAULT NULL,
+				message_type VARCHAR(50) DEFAULT 'text',
+				remote_jid VARCHAR(255) DEFAULT NULL,
+				instance_name VARCHAR(255) DEFAULT NULL,
+				raw_data JSON DEFAULT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`);
+
 		// Migrations - adicionar novos tipos ao ENUM
 		await pool.query(`
 			ALTER TABLE automations MODIFY COLUMN type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message'

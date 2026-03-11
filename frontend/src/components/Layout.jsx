@@ -6,6 +6,7 @@ import {
   FaProjectDiagram,
   FaCog,
   FaSignOutAlt,
+  FaUsers,
 } from "react-icons/fa";
 
 const menuSections = [
@@ -13,6 +14,12 @@ const menuSections = [
     label: "GERAL",
     links: [
       { to: "/", label: "Dashboard", icon: FaHome },
+    ],
+  },
+  {
+    label: "CRM",
+    links: [
+      { to: "/crm", label: "Contatos", icon: FaUsers },
     ],
   },
   {
