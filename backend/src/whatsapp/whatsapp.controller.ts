@@ -24,7 +24,14 @@ export class WhatsappController {
 
 	@Get("instances/:name/status")
 	async status(@Param("name") name: string) {
-		return this.whatsappService.getConnectionStatus(name);
+		const result = await this.whatsappService.getConnectionStatus(name);
+
+		// Auto-configure CRM webhook when instance connects
+		if (result.status === "connected") {
+			this.whatsappService.autoConfigureCrmWebhook(name).catch(() => {});
+		}
+
+		return result;
 	}
 
 	@Post("instances/:name/webhook")

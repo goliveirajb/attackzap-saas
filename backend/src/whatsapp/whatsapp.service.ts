@@ -230,6 +230,40 @@ export class WhatsappService {
 		}));
 	}
 
+	// Auto-configurar webhook do CRM ao conectar instancia
+	async autoConfigureCrmWebhook(instanceName: string) {
+		const pool = this.db.getPool();
+
+		// Check if webhook already set for this instance
+		const [rows] = await pool.query(
+			`SELECT webhook_url FROM whatsapp_instances WHERE instance_name = ? LIMIT 1`,
+			[instanceName],
+		);
+		const instance = (rows as any[])[0];
+		const baseUrl = process.env.API_BASE_URL || process.env.WEBHOOK_BASE_URL || "";
+
+		if (!baseUrl) {
+			this.logger.warn("API_BASE_URL not set, skipping auto CRM webhook");
+			return;
+		}
+
+		const crmWebhookUrl = `${baseUrl}/api/crm/webhook`;
+
+		// Only set if not already configured with our CRM webhook
+		if (instance?.webhook_url === crmWebhookUrl) return;
+
+		try {
+			await this.setWebhook(instanceName, crmWebhookUrl);
+			await pool.query(
+				`UPDATE whatsapp_instances SET webhook_url = ? WHERE instance_name = ?`,
+				[crmWebhookUrl, instanceName],
+			);
+			this.logger.log(`CRM webhook auto-configured for ${instanceName}: ${crmWebhookUrl}`);
+		} catch (err) {
+			this.logger.error(`Failed to auto-configure CRM webhook for ${instanceName}: ${err.message}`);
+		}
+	}
+
 	// Listar instancias do usuario
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();
