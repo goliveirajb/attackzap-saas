@@ -52,9 +52,14 @@ export default function ScheduledMessages({ automationId = null }) {
   const [formNumbers, setFormNumbers] = useState("");
   const [formDias, setFormDias] = useState([0, 1, 2, 3, 4, 5, 6]);
 
-  // Modal editar dias
-  const [editDiasId, setEditDiasId] = useState(null);
-  const [editDias, setEditDias] = useState([]);
+  // Modal editar (completo)
+  const [modalEditar, setModalEditar] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editHorario, setEditHorario] = useState("08:00");
+  const [editText, setEditText] = useState("");
+  const [editNumbers, setEditNumbers] = useState("");
+  const [editDias, setEditDias] = useState([0, 1, 2, 3, 4, 5, 6]);
+  const [salvando, setSalvando] = useState(false);
 
   // Preview imagem
   const [previewImagem, setPreviewImagem] = useState(null);
@@ -187,21 +192,39 @@ export default function ScheduledMessages({ automationId = null }) {
     }
   };
 
-  const salvarDias = async () => {
-    if (!editDiasId || editDias.length === 0) {
-      toast.error("Selecione pelo menos um dia");
-      return;
-    }
+  const openEditar = (msg) => {
+    setEditId(msg.id);
+    setEditHorario(formatHorario(msg.horario));
+    setEditText(msg.message_text || "");
+    setEditNumbers(msg.target_numbers || "");
+    setEditDias(parseDias(msg.dias_semana));
+    setModalEditar(true);
+  };
+
+  const handleEditar = async () => {
+    if (!editHorario) return toast.error("Defina o horario");
+    if (editDias.length === 0) return toast.error("Selecione pelo menos um dia");
+    if (!editNumbers.trim()) return toast.error("Informe os numeros");
+
+    setSalvando(true);
     try {
-      await authFetch(`/api/scheduled-messages/${editDiasId}`, {
+      const res = await authFetch(`/api/scheduled-messages/${editId}`, {
         method: "PUT",
-        body: JSON.stringify({ dias_semana: editDias.sort((a, b) => a - b).join(",") }),
+        body: JSON.stringify({
+          horario: editHorario + ":00",
+          message_text: editText,
+          target_numbers: editNumbers.trim(),
+          dias_semana: editDias.sort((a, b) => a - b).join(","),
+        }),
       });
-      toast.success("Dias atualizados!");
-      setEditDiasId(null);
+      if (!res.ok) throw new Error();
+      toast.success("Mensagem atualizada!");
+      setModalEditar(false);
       load();
     } catch {
-      toast.error("Erro ao atualizar dias");
+      toast.error("Erro ao atualizar mensagem");
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -302,6 +325,9 @@ export default function ScheduledMessages({ automationId = null }) {
                     <span className="text-lg font-bold text-white">{formatHorario(msg.horario)}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button onClick={() => openEditar(msg)} className="text-gray-400 hover:text-primary transition" title="Editar">
+                      <FaPen size={12} />
+                    </button>
                     <button onClick={() => handleToggle(msg)} title={msg.active ? "Desativar" : "Ativar"}>
                       {msg.active ? (
                         <FaToggleOn className="text-xl text-green-400 hover:text-green-500 transition" />
@@ -319,13 +345,6 @@ export default function ScheduledMessages({ automationId = null }) {
                 <div className="px-4 pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] text-gray-500 uppercase font-medium">Dias</span>
-                    <button
-                      onClick={() => { setEditDiasId(msg.id); setEditDias([...diasMsg]); }}
-                      className="text-gray-500 hover:text-primary transition"
-                      title="Editar dias"
-                    >
-                      <FaPen size={10} />
-                    </button>
                   </div>
                   <div className="flex gap-1">
                     {DIAS_SEMANA.map((dia) => {
@@ -502,43 +521,88 @@ export default function ScheduledMessages({ automationId = null }) {
         </div>
       )}
 
-      {/* ===== Modal Editar Dias ===== */}
-      {editDiasId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setEditDiasId(null)}>
-          <div className="bg-dark-card rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-dark-border" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white mb-4">Editar Dias da Semana</h2>
+      {/* ===== Modal Editar Mensagem ===== */}
+      {modalEditar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setModalEditar(false)}>
+          <div className="bg-dark-card rounded-2xl shadow-2xl w-full max-w-md p-6 border border-dark-border" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-white mb-4">Editar Mensagem Programada</h2>
 
-            <div className="flex flex-wrap gap-2 mb-4">
-              {DIAS_SEMANA.map((dia) => {
-                const ativo = editDias.includes(dia.value);
-                return (
-                  <button
-                    key={dia.value}
-                    type="button"
-                    onClick={() => toggleDia(editDias, setEditDias, dia.value)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                      ativo
-                        ? "bg-primary text-white"
-                        : "bg-dark-cardSoft text-gray-400 hover:bg-dark-cardSoft/80"
-                    }`}
-                  >
-                    {dia.full}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-3 mb-4">
-              <button type="button" onClick={() => setEditDias([0,1,2,3,4,5,6])} className="text-[10px] text-primary hover:underline">Todos</button>
-              <button type="button" onClick={() => setEditDias([1,2,3,4,5])} className="text-[10px] text-primary hover:underline">Seg-Sex</button>
-              <button type="button" onClick={() => setEditDias([0,6])} className="text-[10px] text-primary hover:underline">Fim de Semana</button>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Horario (Brasilia)</label>
+                <input
+                  type="time"
+                  value={editHorario}
+                  onChange={(e) => setEditHorario(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Numeros WhatsApp</label>
+                <input
+                  type="text"
+                  value={editNumbers}
+                  onChange={(e) => setEditNumbers(e.target.value)}
+                  placeholder="5511999999999,5511888888888"
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Texto da mensagem</label>
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  placeholder="Texto da mensagem (ou deixe vazio se for enviar apenas imagem)"
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Dias da Semana</label>
+                <div className="flex flex-wrap gap-2">
+                  {DIAS_SEMANA.map((dia) => {
+                    const ativo = editDias.includes(dia.value);
+                    return (
+                      <button
+                        key={dia.value}
+                        type="button"
+                        onClick={() => toggleDia(editDias, setEditDias, dia.value)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                          ativo
+                            ? "bg-primary text-white"
+                            : "bg-dark-cardSoft text-gray-400 hover:bg-dark-cardSoft/80"
+                        }`}
+                      >
+                        {dia.full}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-3 mt-2">
+                  <button type="button" onClick={() => setEditDias([0,1,2,3,4,5,6])} className="text-[10px] text-primary hover:underline">Todos</button>
+                  <button type="button" onClick={() => setEditDias([1,2,3,4,5])} className="text-[10px] text-primary hover:underline">Seg-Sex</button>
+                  <button type="button" onClick={() => setEditDias([0,6])} className="text-[10px] text-primary hover:underline">Fim de Semana</button>
+                  <button type="button" onClick={() => setEditDias([])} className="text-[10px] text-gray-500 hover:underline">Limpar</button>
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setEditDiasId(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-dark-cardSoft transition">
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setModalEditar(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-dark-cardSoft transition"
+              >
                 Cancelar
               </button>
-              <button onClick={salvarDias} className="px-6 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primaryLight transition">
-                Salvar
+              <button
+                onClick={handleEditar}
+                disabled={salvando}
+                className="px-6 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primaryLight disabled:opacity-50 transition"
+              >
+                {salvando ? "Salvando..." : "Salvar"}
               </button>
             </div>
           </div>
