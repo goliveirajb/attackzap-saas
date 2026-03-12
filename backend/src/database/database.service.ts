@@ -154,6 +154,11 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE automations MODIFY COLUMN type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message'
 		`).catch(() => {});
 
+		// Add last_read_at column to contacts for unread count tracking
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN last_read_at TIMESTAMP NULL AFTER last_message_at
+		`).catch(() => {});
+
 		await pool.query(`
 			CREATE TABLE IF NOT EXISTS push_subscriptions (
 				id INT AUTO_INCREMENT PRIMARY KEY,

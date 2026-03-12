@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useState } from "react";
 import {
@@ -61,10 +61,24 @@ const getMenuSections = (role) => {
   return sections;
 };
 
+// Bottom nav items for mobile
+const getBottomNavItems = () => {
+  const items = [
+    { to: "/", label: "Inicio", icon: FaHome },
+    { to: "/conversations", label: "Conversas", icon: FaComments },
+    { to: "/crm", label: "Contatos", icon: FaUsers },
+    { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
+    { to: "/settings", label: "Config", icon: FaCog },
+  ];
+  return items;
+};
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -73,6 +87,11 @@ export default function Layout() {
 
   const closeMobile = () => setMobileOpen(false);
 
+  const isConversationsPage = location.pathname === "/conversations";
+
+  // All menu links flattened for the collapsed sidebar
+  const allLinks = getMenuSections(user?.role).flatMap((s) => s.links);
+
   return (
     <div className="min-h-screen flex">
       {/* Mobile overlay */}
@@ -80,25 +99,120 @@ export default function Layout() {
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={closeMobile} />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - collapsed by default (icons only), expands on hover/click */}
+      <aside
+        onMouseEnter={() => setSidebarExpanded(true)}
+        onMouseLeave={() => setSidebarExpanded(false)}
+        className={`
+          fixed md:static inset-y-0 left-0 z-50
+          ${sidebarExpanded ? "w-64" : "w-[68px]"}
+          bg-dark-card border-r border-dark-border flex-col
+          transition-all duration-200 ease-in-out
+          hidden md:flex
+        `}
+      >
+        {/* Header */}
+        <div className={`border-b border-dark-border flex items-center ${sidebarExpanded ? "p-5" : "p-3 justify-center"}`}>
+          {sidebarExpanded ? (
+            <div>
+              <h1 className="text-xl font-extrabold text-primary tracking-wider">ATTACKZAP</h1>
+              <p className="text-xs text-gray-400 mt-0.5">CRM WhatsApp</p>
+            </div>
+          ) : (
+            <h1 className="text-lg font-extrabold text-primary">AZ</h1>
+          )}
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3">
+          {sidebarExpanded ? (
+            getMenuSections(user?.role).map((section) => (
+              <div key={section.label} className="mb-4 px-3">
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4 mb-2">
+                  {section.label}
+                </p>
+                <div className="space-y-0.5">
+                  {section.links.map((link) => (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      end={link.to === "/"}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          isActive
+                            ? "bg-primary text-white shadow-md"
+                            : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
+                        }`
+                      }
+                    >
+                      <link.icon className="text-base" />
+                      {link.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center gap-1 px-2">
+              {allLinks.map((link) => (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === "/"}
+                  title={link.label}
+                  className={({ isActive }) =>
+                    `w-11 h-11 flex items-center justify-center rounded-xl transition-all ${
+                      isActive
+                        ? "bg-primary text-white shadow-md"
+                        : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
+                    }`
+                  }
+                >
+                  <link.icon size={18} />
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </nav>
+
+        {/* Footer */}
+        <div className={`border-t border-dark-border ${sidebarExpanded ? "p-3" : "p-2"}`}>
+          {sidebarExpanded ? (
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-xs text-gray-400 truncate">
+                {user?.name || user?.email}
+              </span>
+              <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition" title="Sair">
+                <FaSignOutAlt />
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <button onClick={handleLogout} className="w-11 h-11 flex items-center justify-center rounded-xl text-gray-500 hover:text-red-400 hover:bg-dark-cardSoft transition" title="Sair">
+                <FaSignOutAlt size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Mobile sidebar (full, for hamburger menu) */}
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-50
+        fixed inset-y-0 left-0 z-50
         w-64 bg-dark-card border-r border-dark-border flex flex-col
         transform transition-transform duration-200
-        ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        md:hidden
+        ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         <div className="p-5 border-b border-dark-border flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-extrabold text-primary tracking-wider">
-              ATTACKZAP
-            </h1>
+            <h1 className="text-xl font-extrabold text-primary tracking-wider">ATTACKZAP</h1>
             <p className="text-xs text-gray-400 mt-0.5">CRM WhatsApp</p>
           </div>
-          <button onClick={closeMobile} className="text-gray-400 hover:text-white md:hidden">
+          <button onClick={closeMobile} className="text-gray-400 hover:text-white">
             <FaTimes size={18} />
           </button>
         </div>
-
         <nav className="flex-1 p-3 overflow-y-auto">
           {getMenuSections(user?.role).map((section) => (
             <div key={section.label} className="mb-4">
@@ -128,17 +242,10 @@ export default function Layout() {
             </div>
           ))}
         </nav>
-
         <div className="p-3 border-t border-dark-border">
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-xs text-gray-400 truncate">
-              {user?.name || user?.email}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-red-400 transition"
-              title="Sair"
-            >
+            <span className="text-xs text-gray-400 truncate">{user?.name || user?.email}</span>
+            <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition" title="Sair">
               <FaSignOutAlt />
             </button>
           </div>
@@ -156,9 +263,34 @@ export default function Layout() {
           <div className="w-6" />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-3 md:p-6">
+        <main className={`flex-1 overflow-y-auto p-3 md:p-6 ${!isConversationsPage ? "pb-20 md:pb-6" : "pb-0 md:pb-6"}`}>
           <Outlet />
         </main>
+
+        {/* Bottom Navigation - Mobile only, hidden on conversations page */}
+        {!isConversationsPage && (
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-dark-card border-t border-dark-border safe-area-bottom">
+            <div className="flex items-center justify-around px-1 py-1.5">
+              {getBottomNavItems().map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all ${
+                      isActive
+                        ? "text-primary"
+                        : "text-gray-500"
+                    }`
+                  }
+                >
+                  <item.icon size={18} />
+                  <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+        )}
       </div>
     </div>
   );

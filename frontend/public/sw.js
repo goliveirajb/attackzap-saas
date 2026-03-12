@@ -1,4 +1,4 @@
-const CACHE_NAME = "attackzap-v2";
+const CACHE_NAME = "attackzap-v3";
 const PRECACHE = ["/", "/index.html"];
 
 self.addEventListener("install", (e) => {
@@ -46,8 +46,8 @@ self.addEventListener("push", (e) => {
 
   const options = {
     body: payload.body || "Nova mensagem",
-    icon: "/icon-192.svg",
-    badge: "/icon-192.svg",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     vibrate: [200, 100, 200],
     tag: payload.data?.contactId ? `contact-${payload.data.contactId}` : "default",
     renotify: true,

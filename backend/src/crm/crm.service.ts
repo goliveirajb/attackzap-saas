@@ -97,7 +97,12 @@ export class CrmService implements OnModuleInit {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
 			`SELECT c.*, cs.name as stage_name, cs.color as stage_color,
-			        wi.instance_name
+			        wi.instance_name,
+			        (SELECT COUNT(*) FROM contact_messages cm
+			         WHERE cm.contact_id = c.id
+			           AND cm.direction = 'incoming'
+			           AND cm.created_at > COALESCE(c.last_read_at, '1970-01-01')
+			        ) as unread_count
 			 FROM contacts c
 			 LEFT JOIN crm_stages cs ON c.stage_id = cs.id
 			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
@@ -173,6 +178,17 @@ export class CrmService implements OnModuleInit {
 	async deleteContact(id: number) {
 		const pool = this.db.getPool();
 		await pool.query(`DELETE FROM contacts WHERE id = ?`, [id]);
+	}
+
+	// ==================== READ STATUS ====================
+
+	async markAsRead(userId: number, contactId: number) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE contacts SET last_read_at = NOW() WHERE id = ? AND user_id = ?`,
+			[contactId, userId],
+		);
+		return { ok: true };
 	}
 
 	// ==================== MESSAGES ====================
@@ -281,8 +297,8 @@ export class CrmService implements OnModuleInit {
 			? "document"
 			: "text";
 
-		// Skip group messages and status broadcasts
-		if (!remoteJid || remoteJid.includes("@g.us") || remoteJid === "status@broadcast") {
+		// Skip group messages, status broadcasts, and @lid (linked device) messages
+		if (!remoteJid || remoteJid.includes("@g.us") || remoteJid === "status@broadcast" || remoteJid.includes("@lid")) {
 			return { ignored: true };
 		}
 

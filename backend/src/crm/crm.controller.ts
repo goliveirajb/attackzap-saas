@@ -80,6 +80,14 @@ export class CrmController {
 		return this.svc.deleteContact(Number(id));
 	}
 
+	// ==================== READ STATUS ====================
+
+	@Put("contacts/:id/read")
+	@UseGuards(JwtAuthGuard)
+	async markAsRead(@Req() req, @Param("id") id: string) {
+		return this.svc.markAsRead(req.user.id, Number(id));
+	}
+
 	// ==================== MESSAGES ====================
 
 	@Get("contacts/:id/messages")

@@ -105,6 +105,9 @@ export default function Conversations() {
   const openChat = (c) => setActiveChat(c);
   const closeChat = () => { setActiveChat(null); load(); };
 
+  // Total unread count for parent components
+  const totalUnread = useMemo(() => contacts.reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0), [contacts]);
+
   // ===================== MOBILE: show chat or list =====================
   // Desktop: side by side | Mobile: one at a time
   return (
@@ -149,6 +152,7 @@ export default function Conversations() {
           ) : (
             filtered.map((c) => {
               const isActive = activeChat?.id === c.id;
+              const unread = Number(c.unread_count) || 0;
               return (
                 <div
                   key={c.id}
@@ -160,32 +164,41 @@ export default function Conversations() {
                   }`}
                 >
                   {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-primaryDark flex-shrink-0 flex items-center justify-center text-white font-bold text-sm">
-                    {getInitials(c)}
+                  <div className="relative w-12 h-12 flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-primaryDark flex items-center justify-center text-white font-bold text-sm">
+                      {getInitials(c)}
+                    </div>
+                    {unread > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-white truncate">
+                      <p className={`text-sm truncate ${unread > 0 ? "font-bold text-white" : "font-semibold text-white"}`}>
                         {c.name || c.phone}
                       </p>
                       <span className={`text-[10px] flex-shrink-0 ml-2 ${
-                        c.last_message_at ? "text-primary" : "text-gray-600"
+                        unread > 0 ? "text-green-400 font-semibold" : c.last_message_at ? "text-primary" : "text-gray-600"
                       }`}>
                         {formatChatDate(c.last_message_at)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className={`text-xs truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
                         {c.name ? c.phone : "Toque para abrir"}
                       </p>
-                      {c.stage_name && (
-                        <span className="text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0 ml-2 font-medium"
-                          style={{ backgroundColor: (c.stage_color || "#666") + "20", color: c.stage_color }}>
-                          {c.stage_name}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {c.stage_name && (
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-full font-medium"
+                            style={{ backgroundColor: (c.stage_color || "#666") + "20", color: c.stage_color }}>
+                            {c.stage_name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -252,6 +265,11 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     }).catch(() => {});
   }, []);
 
+  // Mark conversation as read when opening
+  useEffect(() => {
+    authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
+  }, [contact.id]);
+
   const loadMessages = useCallback(async () => {
     try {
       const res = await authFetch(`/api/crm/contacts/${contact.id}/messages?limit=100`);
@@ -275,6 +293,8 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     return subscribeEvents((event) => {
       if (event.type === "new_message" && event.contactId === contact.id) {
         loadMessages();
+        // Mark as read since we're viewing this chat
+        authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
       }
     });
   }, [subscribeEvents, contact.id, loadMessages]);
@@ -283,7 +303,14 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => { inputRef.current?.focus(); }, [contact.id]);
+  // Do NOT auto-focus the input on mobile to prevent keyboard from opening
+  // Only auto-focus on desktop
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile) {
+      inputRef.current?.focus();
+    }
+  }, [contact.id]);
 
   // Sync edit form when contact changes
   useEffect(() => {
