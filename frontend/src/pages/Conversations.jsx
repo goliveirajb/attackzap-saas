@@ -5,7 +5,17 @@ import {
   FaWhatsapp, FaSearch, FaSpinner, FaPaperPlane, FaCheck, FaCheckDouble,
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
+  FaSmile, FaPaperclip,
 } from "react-icons/fa";
+
+const EMOJI_LIST = [
+  "😀","😂","🤣","😊","😍","🥰","😘","😜","🤔","😎",
+  "🤩","🥳","😇","🤗","🤭","😏","😌","😴","🤮","😷",
+  "👍","👎","👏","🙌","🤝","💪","🙏","❤️","🔥","⭐",
+  "💯","✅","❌","⚡","🎉","🎯","💰","📱","💬","📞",
+  "🕐","📅","📍","🏠","🚗","✈️","🎁","🛒","📦","💼",
+  "👋","🤞","✌️","🤙","👀","💡","🔑","📝","💳","🏷️",
+];
 
 const formatTime = (d) => {
   if (!d) return "";
@@ -209,6 +219,9 @@ function ChatPanel({ contact: initialContact, authFetch, onBack }) {
   const [showInfo, setShowInfo] = useState(false);
   const [editing, setEditing] = useState(false);
   const [stages, setStages] = useState([]);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
@@ -292,6 +305,48 @@ function ChatPanel({ contact: initialContact, authFetch, onBack }) {
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleMediaUpload = async (file) => {
+    if (!file) return;
+    const maxSize = 15 * 1024 * 1024; // 15MB
+    if (file.size > maxSize) return toast.error("Arquivo muito grande (max 15MB)");
+
+    setUploadingMedia(true);
+    const toastId = toast.loading("Enviando arquivo...");
+
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const isVideo = file.type.startsWith("video/");
+      const mediaType = isVideo ? "video" : "image";
+
+      const res = await authFetch(`/api/crm/contacts/${contact.id}/send-media`, {
+        method: "POST",
+        body: JSON.stringify({ base64, caption: text.trim() || "", mediaType }),
+      });
+      toast.dismiss(toastId);
+      if (!res.ok) throw new Error();
+
+      setText("");
+      toast.success(`${isVideo ? "Video" : "Imagem"} enviado!`);
+      loadMessages();
+    } catch {
+      toast.dismiss(toastId);
+      toast.error("Erro ao enviar arquivo");
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const insertEmoji = (emoji) => {
+    setText((prev) => prev + emoji);
+    inputRef.current?.focus();
   };
 
   const handleSaveContact = async () => {
@@ -426,13 +481,42 @@ function ChatPanel({ contact: initialContact, authFetch, onBack }) {
             )}
           </div>
 
+          {/* Emoji Picker */}
+          {showEmoji && (
+            <div className="px-3 md:px-4 py-2 bg-dark-card border-t border-dark-border">
+              <div className="max-w-2xl mx-auto grid grid-cols-10 gap-1 max-h-32 overflow-y-auto">
+                {EMOJI_LIST.map((e, i) => (
+                  <button key={i} onClick={() => insertEmoji(e)}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-dark-cardSoft transition text-lg">
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Input */}
           <div className="px-3 md:px-4 py-2.5 bg-dark-card border-t border-dark-border">
-            <div className="flex items-end gap-2 max-w-2xl mx-auto">
+            <div className="flex items-end gap-1.5 md:gap-2 max-w-2xl mx-auto">
+              <button onClick={() => setShowEmoji(!showEmoji)}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                  showEmoji ? "bg-primary/10 text-primary" : "text-gray-500 hover:text-gray-300"
+                }`} title="Emojis">
+                <FaSmile size={16} />
+              </button>
+
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 transition flex-shrink-0"
+                title="Enviar imagem ou video">
+                <FaPaperclip size={15} />
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
+
               <div className="flex-1 bg-dark-cardSoft border border-dark-border rounded-2xl px-3 md:px-4 py-2 flex items-end">
                 <textarea
                   ref={inputRef} value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => { setText(e.target.value); setShowEmoji(false); }}
                   onKeyDown={handleKeyDown}
                   placeholder="Mensagem..."
                   rows={1}
@@ -441,11 +525,12 @@ function ChatPanel({ contact: initialContact, authFetch, onBack }) {
                   onInput={(e) => { e.target.style.height = "20px"; e.target.style.height = Math.min(e.target.scrollHeight, 112) + "px"; }}
                 />
               </div>
-              <button onClick={handleSend} disabled={!text.trim() || sending}
+
+              <button onClick={handleSend} disabled={(!text.trim() && !uploadingMedia) || sending}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
                   text.trim() ? "bg-primary hover:bg-primaryLight text-white shadow-lg shadow-primary/30" : "bg-dark-cardSoft text-gray-600"
                 }`}>
-                {sending ? <FaSpinner className="animate-spin" size={13} /> : <FaPaperPlane size={13} />}
+                {sending || uploadingMedia ? <FaSpinner className="animate-spin" size={13} /> : <FaPaperPlane size={13} />}
               </button>
             </div>
           </div>

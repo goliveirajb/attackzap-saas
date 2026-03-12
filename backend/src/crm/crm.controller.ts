@@ -90,6 +90,12 @@ export class CrmController {
 		return this.svc.sendMessage(req.user.id, Number(id), body.text);
 	}
 
+	@Post("contacts/:id/send-media")
+	@UseGuards(JwtAuthGuard)
+	async sendMedia(@Req() req, @Param("id") id: string, @Body() body: { base64: string; caption?: string; mediaType?: string }) {
+		return this.svc.sendMedia(req.user.id, Number(id), body.base64, body.caption || "", body.mediaType || "image");
+	}
+
 	// ==================== WEBHOOK (public - called by Evolution) ====================
 
 	@Post("webhook")

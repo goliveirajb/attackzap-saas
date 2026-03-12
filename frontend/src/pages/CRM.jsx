@@ -256,22 +256,22 @@ export default function CRM() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
             <FaUsers className="text-primary" /> CRM
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-[10px] md:text-xs text-gray-500 mt-0.5">
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""} | Arraste os cards entre as etapas
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 md:flex-none">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs" />
             <input
               type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar..."
-              className="pl-8 pr-4 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary w-48"
+              className="pl-8 pr-4 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary w-full md:w-48"
             />
           </div>
           <div className="flex bg-dark-cardSoft rounded-lg border border-dark-border overflow-hidden">
@@ -286,11 +286,11 @@ export default function CRM() {
           </div>
           <button onClick={() => setModalStage(true)}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary border border-dark-border px-3 py-2 rounded-lg transition">
-            <FaPlus size={10} /> Etapa
+            <FaPlus size={10} /> <span className="hidden sm:inline">Etapa</span>
           </button>
           <button onClick={() => openNewContact()}
-            className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-xs font-medium px-4 py-2 rounded-lg transition">
-            <FaUserPlus size={12} /> Novo Contato
+            className="flex items-center gap-2 bg-primary hover:bg-primaryLight text-white text-xs font-medium px-3 md:px-4 py-2 rounded-lg transition">
+            <FaUserPlus size={12} /> <span className="hidden sm:inline">Novo Contato</span>
           </button>
         </div>
       </div>
@@ -298,12 +298,12 @@ export default function CRM() {
       {/* ===== KANBAN ===== */}
       {viewMode === "kanban" && (
         <div className="flex-1 overflow-x-auto pb-4">
-          <div className="flex gap-3" style={{ minWidth: stages.length * 290 }}>
+          <div className="flex gap-3" style={{ minWidth: stages.length * 260 }}>
             {stages.map((stage) => {
               const stageContacts = contactsByStage[stage.id] || [];
               const isDragOver = dragOverStage === stage.id;
               return (
-                <div key={stage.id} className="flex-shrink-0 w-[280px] flex flex-col">
+                <div key={stage.id} className="flex-shrink-0 w-[240px] md:w-[280px] flex flex-col">
                   {/* Stage header */}
                   <div className="flex items-center justify-between px-3 py-2.5 rounded-t-xl border border-b-0"
                     style={{
@@ -421,7 +421,38 @@ export default function CRM() {
       {/* ===== LIST VIEW ===== */}
       {viewMode === "list" && (
         <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          {/* Mobile: cards | Desktop: table */}
+          <div className="md:hidden space-y-2 p-2">
+            {filteredContacts.map((c) => (
+              <div key={c.id} onClick={() => openChat(c)}
+                className="bg-dark-cardSoft/50 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-dark-cardSoft transition">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/80 to-primaryDark flex-shrink-0 flex items-center justify-center text-white font-bold text-xs">
+                  {(c.name || c.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white truncate">{c.name || c.phone}</p>
+                    {c.stage_name && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full ml-2 flex-shrink-0 font-medium"
+                        style={{ backgroundColor: (c.stage_color || "#666") + "20", color: c.stage_color }}>
+                        {c.stage_name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-mono">{c.phone}</p>
+                </div>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => openEditContact(c)} className="text-gray-500 hover:text-primary transition p-1"><FaPen size={11} /></button>
+                  <button onClick={() => handleDeleteContact(c.id)} className="text-gray-600 hover:text-red-400 transition p-1"><FaTrash size={11} /></button>
+                </div>
+              </div>
+            ))}
+            {filteredContacts.length === 0 && (
+              <div className="py-12 text-center text-gray-500 text-sm">Nenhum contato encontrado.</div>
+            )}
+          </div>
+
+          <table className="w-full text-sm hidden md:table">
             <thead>
               <tr className="border-b border-dark-border">
                 <th className="text-left px-4 py-3 text-[10px] text-gray-500 uppercase font-medium">Contato</th>

@@ -216,6 +216,36 @@ export class CrmService implements OnModuleInit {
 		return { ok: true };
 	}
 
+	async sendMedia(userId: number, contactId: number, base64: string, caption: string, mediaType: string) {
+		const pool = this.db.getPool();
+
+		const [rows] = await pool.query(
+			`SELECT c.*, wi.instance_name
+			 FROM contacts c
+			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
+			 WHERE c.id = ? AND c.user_id = ?`,
+			[contactId, userId],
+		);
+		const contact = (rows as any[])[0];
+		if (!contact) throw new Error("Contato nao encontrado");
+		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
+
+		// Send via Evolution
+		await this.whatsapp.sendMedia(contact.instance_name, contact.phone, base64, caption);
+
+		// Save to DB
+		await pool.query(
+			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name)
+			 VALUES (?, ?, 'outgoing', ?, ?, ?, ?)`,
+			[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name],
+		);
+
+		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
+
+		this.logger.log(`Media sent to ${contact.phone} via ${contact.instance_name}`);
+		return { ok: true };
+	}
+
 	// ==================== WEBHOOK (Evolution) ====================
 
 	async processIncomingMessage(payload: any) {
@@ -230,10 +260,12 @@ export class CrmService implements OnModuleInit {
 		const instanceName = payload?.instance;
 		const remoteJid = data?.key?.remoteJid;
 		const fromMe = data?.key?.fromMe;
+		const pushName = data?.pushName || payload?.data?.pushName || null;
 		const messageText =
 			data?.message?.conversation ||
 			data?.message?.extendedTextMessage?.text ||
 			data?.message?.imageMessage?.caption ||
+			data?.message?.videoMessage?.caption ||
 			"";
 		const messageType = data?.message?.imageMessage
 			? "image"
@@ -268,15 +300,16 @@ export class CrmService implements OnModuleInit {
 		const stages = await this.getStages(userId);
 		const firstStage = (stages as any[])[0];
 
-		// Upsert contact
+		// Upsert contact (with pushName from WhatsApp)
 		await pool.query(
-			`INSERT INTO contacts (user_id, instance_id, phone, stage_id, last_message_at)
-			 VALUES (?, ?, ?, ?, NOW())
+			`INSERT INTO contacts (user_id, instance_id, phone, name, stage_id, last_message_at)
+			 VALUES (?, ?, ?, ?, ?, NOW())
 			 ON DUPLICATE KEY UPDATE
 			   instance_id = COALESCE(VALUES(instance_id), instance_id),
+			   name = COALESCE(name, VALUES(name)),
 			   last_message_at = NOW(),
 			   updated_at = NOW()`,
-			[userId, instanceId, phone, firstStage?.id || null],
+			[userId, instanceId, phone, pushName, firstStage?.id || null],
 		);
 
 		// Get contact ID
