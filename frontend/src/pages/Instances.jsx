@@ -253,16 +253,14 @@ export default function Instances() {
                     <FaQrcode /> QR Code
                   </button>
                 )}
-                {inst.status === "connected" && (
-                  <button
-                    onClick={() => handleFixWebhook(inst.instance_name)}
-                    disabled={fixingWebhook === inst.instance_name}
-                    className="flex items-center gap-1.5 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition disabled:opacity-50"
-                    title="Reconfigurar webhook (corrige problemas de recebimento)"
-                  >
-                    <FaPlug /> {fixingWebhook === inst.instance_name ? "Corrigindo..." : "Fix Webhook"}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleFixWebhook(inst.instance_name)}
+                  disabled={fixingWebhook === inst.instance_name}
+                  className="flex items-center gap-1.5 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition disabled:opacity-50"
+                  title="Reconfigurar webhook (corrige problemas de recebimento)"
+                >
+                  <FaPlug /> {fixingWebhook === inst.instance_name ? "Corrigindo..." : "Fix Webhook"}
+                </button>
                 <button
                   onClick={() => fetchQrCode(inst.instance_name)}
                   className="text-gray-500 hover:text-primary p-2 transition"

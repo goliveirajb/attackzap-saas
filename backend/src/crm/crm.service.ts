@@ -386,6 +386,21 @@ export class CrmService implements OnModuleInit {
 		return this.whatsapp.debugInstances();
 	}
 
+	async fixWebhookForInstance(name: string) {
+		return this.whatsapp.autoConfigureCrmWebhook(name, true);
+	}
+
+	async fixAllWebhooks() {
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(`SELECT instance_name FROM whatsapp_instances`);
+		const results: any[] = [];
+		for (const row of rows as any[]) {
+			const res = await this.whatsapp.autoConfigureCrmWebhook(row.instance_name, true);
+			results.push({ instance: row.instance_name, ...res });
+		}
+		return results;
+	}
+
 	// ==================== WEBHOOK (Evolution) ====================
 
 	async processIncomingMessage(payload: any) {

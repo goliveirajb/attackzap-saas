@@ -167,6 +167,18 @@ export class CrmController {
 		return this.svc.debugInstances();
 	}
 
+	// Fix webhook for a specific instance (public - for debugging)
+	@Post("debug/fix-webhook/:name")
+	async debugFixWebhook(@Param("name") name: string) {
+		return this.svc.fixWebhookForInstance(name);
+	}
+
+	// Fix webhook for ALL instances (public - for debugging)
+	@Post("debug/fix-all-webhooks")
+	async debugFixAllWebhooks() {
+		return this.svc.fixAllWebhooks();
+	}
+
 	@Post("webhook")
 	async webhook(@Body() body: any) {
 		console.log("[CRM WEBHOOK] Received:", JSON.stringify({
