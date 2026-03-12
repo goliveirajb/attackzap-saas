@@ -249,7 +249,7 @@ export default function Conversations() {
   }, [activeChat]);
 
   return (
-    <div className={`flex overflow-hidden border border-dark-border bg-dark-card md:rounded-2xl ${activeChat ? "fixed inset-0 z-40 md:static md:z-auto md:h-full" : "h-full rounded-2xl"}`}>
+    <div className={`flex overflow-hidden bg-dark-card h-full ${activeChat ? "fixed inset-0 z-40 md:static md:z-auto" : ""}`}>
       {/* ===== CHAT LIST (left panel) ===== */}
       <div className={`w-full md:w-[360px] lg:w-[400px] flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-card
         ${activeChat ? "hidden md:flex" : "flex"}`}>
@@ -817,7 +817,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 md:px-5 py-3 bg-dark-card border-b border-dark-border">
+      <div className="flex items-center justify-between px-3 md:px-5 py-2 bg-[#202c33] border-b border-[#2a3942]">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
             <FaArrowLeft size={14} />
@@ -851,8 +851,8 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
         <div className={`flex-1 flex flex-col ${showInfo ? "hidden md:flex" : "flex"}`}>
-          <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3"
-            style={{ backgroundImage: "radial-gradient(circle at 20% 50%, rgba(10,111,190,0.03) 0%, transparent 50%)" }}>
+          <div className="flex-1 overflow-y-auto px-3 md:px-6 lg:px-12 py-3"
+            style={{ backgroundColor: "#0b141a", backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <FaSpinner className="animate-spin text-primary text-xl mr-2" />
@@ -865,7 +865,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                 <p className="text-gray-600 text-[10px] mt-1">Envie a primeira mensagem</p>
               </div>
             ) : (
-              <div className="space-y-1 max-w-2xl mx-auto">
+              <div className="space-y-1 max-w-4xl mx-auto">
                 {groupedMessages.map((item, i) => {
                   if (item.type === "date") {
                     return (
@@ -880,10 +880,10 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                   const isMedia = ["image", "video", "audio"].includes(item.message_type) && item.has_media;
                   return (
                     <div key={item.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[85%] md:max-w-[70%] px-3 py-2 rounded-2xl ${
+                      <div className={`max-w-[85%] md:max-w-[65%] px-3 py-1.5 rounded-lg shadow-sm ${
                         isOut
-                          ? "bg-primary/90 text-white rounded-br-md"
-                          : "bg-dark-card text-gray-200 rounded-bl-md border border-dark-border/50"
+                          ? "bg-[#005c4b] text-white rounded-tr-none"
+                          : "bg-[#202c33] text-gray-100 rounded-tl-none"
                       }`}>
                         {/* Media content */}
                         {isMedia && item.message_type === "image" && (
@@ -910,7 +910,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                             </p>
                           );
                         })()}
-                        <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOut ? "text-white/50" : "text-gray-500"}`}>
+                        <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOut ? "text-[#ffffff80]" : "text-[#8696a0]"}`}>
                           <span className="text-[9px]">{formatTime(item.created_at)}</span>
                           {isOut && (item._sending ? <FaCheck size={7} className="text-white/30" /> : <FaCheckDouble size={7} />)}
                         </div>
@@ -925,8 +925,8 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
 
           {/* Emoji Picker */}
           {showEmoji && (
-            <div className="px-3 md:px-4 py-2 bg-dark-card border-t border-dark-border">
-              <div className="max-w-2xl mx-auto max-h-40 overflow-y-auto">
+            <div className="px-3 md:px-6 lg:px-12 py-2 bg-[#202c33] border-t border-[#2a3942]">
+              <div className="max-w-4xl mx-auto max-h-40 overflow-y-auto">
                 {recentEmojis.length > 0 && (
                   <>
                     <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">Recentes</p>
@@ -954,8 +954,8 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
 
           {/* Quick Replies Panel */}
           {showQuickReplies && (
-            <div className="px-3 md:px-4 py-2 bg-dark-card border-t border-dark-border">
-              <div className="max-w-2xl mx-auto">
+            <div className="px-3 md:px-6 lg:px-12 py-2 bg-[#202c33] border-t border-[#2a3942]">
+              <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] text-gray-400 uppercase font-semibold flex items-center gap-1"><FaBolt size={8} /> Respostas Rapidas</p>
                   <button onClick={() => setShowQuickReplies(false)} className="text-gray-500 hover:text-white"><FaTimes size={10} /></button>
@@ -996,8 +996,8 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           )}
 
           {/* Input */}
-          <div className="px-3 md:px-4 py-2.5 bg-dark-card border-t border-dark-border">
-            <div className="flex items-end gap-1.5 md:gap-2 max-w-2xl mx-auto">
+          <div className="px-3 md:px-6 lg:px-12 py-2 bg-[#202c33]">
+            <div className="flex items-end gap-2 max-w-4xl mx-auto">
               {recording ? (
                 /* Recording mode */
                 <>
@@ -1020,7 +1020,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
               ) : (
                 /* Normal input mode */
                 <>
-                  <div className="flex-1 bg-dark-cardSoft rounded-2xl px-2 md:px-3 py-1.5 flex items-end gap-1">
+                  <div className="flex-1 bg-[#2a3942] rounded-lg px-2 md:px-3 py-1.5 flex items-end gap-1">
                     <button onClick={() => { setShowEmoji(!showEmoji); setShowQuickReplies(false); }}
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition flex-shrink-0 ${
                         showEmoji ? "text-primary" : "text-gray-500 hover:text-gray-300"

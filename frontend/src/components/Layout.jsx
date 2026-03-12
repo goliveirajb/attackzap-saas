@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useState } from "react";
 import {
@@ -76,8 +76,10 @@ const getBottomNavItems = () => {
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const isConversations = location.pathname.includes("/conversations");
 
   const handleLogout = () => {
     logout();
@@ -260,7 +262,7 @@ export default function Layout() {
           <div className="w-6" />
         </header>
 
-        <main id="main-content" className="flex-1 overflow-y-auto p-3 md:p-6 pb-16 md:pb-6">
+        <main id="main-content" className={`flex-1 overflow-y-auto ${isConversations ? "p-0 pb-14 md:pb-0" : "p-3 md:p-6 pb-16 md:pb-6"}`}>
           <Outlet />
         </main>
 
