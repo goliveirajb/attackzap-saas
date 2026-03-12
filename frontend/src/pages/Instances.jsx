@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { FaWhatsapp, FaPlus, FaTrash, FaSync, FaQrcode } from "react-icons/fa";
+import { FaWhatsapp, FaPlus, FaTrash, FaSync, FaQrcode, FaPen, FaCheck, FaTimes } from "react-icons/fa";
 
 export default function Instances() {
   const { authFetch } = useAuth();
@@ -11,6 +11,8 @@ export default function Instances() {
   const [newName, setNewName] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [qrModal, setQrModal] = useState(null); // { instanceName, qrcode, status }
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
   const pollRef = useRef(null);
 
   const load = async () => {
@@ -106,6 +108,33 @@ export default function Instances() {
     }
   };
 
+  const startEdit = (inst) => {
+    setEditingId(inst.id);
+    setEditName(inst.instance_name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+  };
+
+  const handleRename = async (id) => {
+    if (!editName.trim()) return toast.error("Digite um nome");
+    try {
+      const res = await authFetch(`/api/whatsapp/instances/${id}/rename`, {
+        method: "PUT",
+        body: JSON.stringify({ name: editName.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Nome atualizado!");
+      setEditingId(null);
+      setEditName("");
+      load();
+    } catch {
+      toast.error("Erro ao renomear");
+    }
+  };
+
   const statusColor = {
     connected: "bg-green-400",
     connecting: "bg-yellow-400 animate-pulse",
@@ -161,11 +190,35 @@ export default function Instances() {
               className="bg-dark-card border border-dark-border rounded-2xl px-5 py-4 flex items-center justify-between"
             >
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-xl bg-green-400/10 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-green-400/10 flex items-center justify-center flex-shrink-0">
                   <FaWhatsapp className="text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">{inst.instance_name}</p>
+                  {editingId === inst.id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleRename(inst.id); if (e.key === "Escape") cancelEdit(); }}
+                        className="px-2 py-1 rounded-lg bg-dark-cardSoft border border-primary text-sm text-white focus:outline-none w-40"
+                        autoFocus
+                      />
+                      <button onClick={() => handleRename(inst.id)} className="text-green-400 hover:text-green-300 transition" title="Salvar">
+                        <FaCheck size={12} />
+                      </button>
+                      <button onClick={cancelEdit} className="text-gray-500 hover:text-gray-300 transition" title="Cancelar">
+                        <FaTimes size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-white">{inst.instance_name}</p>
+                      <button onClick={() => startEdit(inst)} className="text-gray-600 hover:text-primary transition" title="Editar nome">
+                        <FaPen size={10} />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`h-2 w-2 rounded-full ${statusColor[inst.status] || statusColor.disconnected}`} />
                     <span className="text-xs text-gray-400 capitalize">{inst.status}</span>

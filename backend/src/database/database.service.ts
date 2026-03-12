@@ -182,6 +182,19 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN is_group TINYINT(1) DEFAULT 0 AFTER phone
 		`).catch(() => {});
 
+		// Add profile_pic_url column to contacts
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN profile_pic_url VARCHAR(500) DEFAULT NULL AFTER is_group
+		`).catch(() => {});
+
+		// Change unique key to include instance_id so groups from different instances are separate
+		await pool.query(`
+			ALTER TABLE contacts DROP INDEX uq_user_phone
+		`).catch(() => {});
+		await pool.query(`
+			ALTER TABLE contacts ADD UNIQUE KEY uq_user_phone_instance (user_id, phone, instance_id)
+		`).catch(() => {});
+
 		// Quick replies table
 		await pool.query(`
 			CREATE TABLE IF NOT EXISTS quick_replies (

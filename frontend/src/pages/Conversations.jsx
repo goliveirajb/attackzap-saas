@@ -54,6 +54,7 @@ export default function Conversations() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
+  const [instanceFilter, setInstanceFilter] = useState(null); // null = all, instance_id
   const [activeChat, setActiveChat] = useState(null);
   const [lastMessages, setLastMessages] = useState({});
 
@@ -93,6 +94,17 @@ export default function Conversations() {
     return () => clearInterval(iv);
   }, []);
 
+  // Extract unique instances from contacts
+  const instances = useMemo(() => {
+    const map = new Map();
+    contacts.forEach((c) => {
+      if (c.instance_id && c.instance_name) {
+        map.set(c.instance_id, { id: c.instance_id, name: c.instance_name });
+      }
+    });
+    return Array.from(map.values());
+  }, [contacts]);
+
   // Extract unique stages from contacts
   const stages = useMemo(() => {
     const map = new Map();
@@ -106,6 +118,10 @@ export default function Conversations() {
 
   const filtered = useMemo(() => {
     let list = contacts;
+    // Instance filter
+    if (instanceFilter !== null) {
+      list = list.filter((c) => c.instance_id === instanceFilter);
+    }
     // Stage filter
     if (stageFilter === "groups") {
       list = list.filter((c) => c.is_group);
@@ -122,7 +138,7 @@ export default function Conversations() {
       );
     }
     return list;
-  }, [contacts, search, stageFilter]);
+  }, [contacts, search, stageFilter, instanceFilter]);
 
   const getInitials = (c) =>
     (c.name || c.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -168,9 +184,39 @@ export default function Conversations() {
               <FaWhatsapp className="text-green-400" /> Conversas
             </h1>
             <span className="text-[10px] text-gray-500 bg-dark-cardSoft px-2 py-1 rounded-full">
-              {stageFilter !== null || search.trim() ? `${filtered.length}/${contacts.length}` : contacts.length}
+              {instanceFilter !== null || stageFilter !== null || search.trim() ? `${filtered.length}/${contacts.length}` : contacts.length}
             </span>
           </div>
+
+          {/* Instance tabs */}
+          {instances.length > 1 && (
+            <div className="flex gap-1 mb-2">
+              <button
+                onClick={() => setInstanceFilter(null)}
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex-1 text-center ${
+                  instanceFilter === null
+                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                    : "bg-dark-cardSoft text-gray-500 hover:text-white border border-transparent"
+                }`}
+              >
+                Todas
+              </button>
+              {instances.map((inst) => (
+                <button
+                  key={inst.id}
+                  onClick={() => setInstanceFilter(instanceFilter === inst.id ? null : inst.id)}
+                  className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex-1 text-center truncate ${
+                    instanceFilter === inst.id
+                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                      : "bg-dark-cardSoft text-gray-500 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <FaWhatsapp size={10} className="inline mr-1" />{inst.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs" />
             <input
@@ -265,9 +311,13 @@ export default function Conversations() {
                 >
                   {/* Avatar */}
                   <div className="relative w-12 h-12 flex-shrink-0">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                    {c.profile_pic_url ? (
+                      <img src={c.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover"
+                        onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
+                    ) : null}
+                    <div className={`w-12 h-12 rounded-full items-center justify-center text-white font-bold text-sm ${
                       c.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary/80 to-primaryDark"
-                    }`}>
+                    }`} style={{ display: c.profile_pic_url ? "none" : "flex", position: c.profile_pic_url ? "absolute" : "relative", top: 0, left: 0 }}>
                       {c.is_group ? <FaUsers size={18} /> : getInitials(c)}
                     </div>
                     {unread > 0 && (
@@ -511,9 +561,20 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     }
   };
 
+  const [recentEmojis, setRecentEmojis] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("recentEmojis") || "[]"); } catch { return []; }
+  });
+
   const insertEmoji = (emoji) => {
     setText((prev) => prev + emoji);
+    setShowEmoji(false);
     inputRef.current?.focus();
+    // Update recent emojis
+    setRecentEmojis((prev) => {
+      const updated = [emoji, ...prev.filter((e) => e !== emoji)].slice(0, 16);
+      localStorage.setItem("recentEmojis", JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const selectQuickReply = (qr) => {
@@ -678,11 +739,15 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
             <FaArrowLeft size={14} />
           </button>
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-            contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
-          }`}>
-            {contact.is_group ? <FaUsers size={16} /> : initials}
-          </div>
+          {contact.profile_pic_url ? (
+            <img src={contact.profile_pic_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
+              contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
+            }`}>
+              {contact.is_group ? <FaUsers size={16} /> : initials}
+            </div>
+          )}
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
               {contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
@@ -784,13 +849,28 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           {/* Emoji Picker */}
           {showEmoji && (
             <div className="px-3 md:px-4 py-2 bg-dark-card border-t border-dark-border">
-              <div className="max-w-2xl mx-auto grid grid-cols-10 gap-1 max-h-32 overflow-y-auto">
-                {EMOJI_LIST.map((e, i) => (
-                  <button key={i} onClick={() => insertEmoji(e)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-dark-cardSoft transition text-lg">
-                    {e}
-                  </button>
-                ))}
+              <div className="max-w-2xl mx-auto max-h-40 overflow-y-auto">
+                {recentEmojis.length > 0 && (
+                  <>
+                    <p className="text-[9px] text-gray-500 uppercase font-semibold mb-1">Recentes</p>
+                    <div className="grid grid-cols-10 gap-1 mb-2">
+                      {recentEmojis.map((e, i) => (
+                        <button key={`r-${i}`} onClick={() => insertEmoji(e)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-dark-cardSoft transition text-lg">
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <div className="grid grid-cols-10 gap-1">
+                  {EMOJI_LIST.map((e, i) => (
+                    <button key={i} onClick={() => insertEmoji(e)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-dark-cardSoft transition text-lg">
+                      {e}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -921,9 +1001,15 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           <div className="w-full md:w-80 flex flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
             {/* Avatar + basic info */}
             <div className="flex flex-col items-center py-5 border-b border-dark-border">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white font-bold text-xl mb-2">
-                {initials}
-              </div>
+              {contact.profile_pic_url ? (
+                <img src={contact.profile_pic_url} alt="" className="w-16 h-16 rounded-full object-cover mb-2" />
+              ) : (
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl mb-2 ${
+                  contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
+                }`}>
+                  {contact.is_group ? <FaUsers size={24} /> : initials}
+                </div>
+              )}
               <p className="text-white font-semibold">{contact.name || "Sem nome"}</p>
               <p className="text-gray-500 text-xs font-mono mt-0.5">{contact.phone}</p>
               {contact.stage_name && !editing && (

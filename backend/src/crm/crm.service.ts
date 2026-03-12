@@ -344,6 +344,42 @@ export class CrmService implements OnModuleInit {
 		return { ok: true };
 	}
 
+	// ==================== PROFILE PICTURES ====================
+
+	async fetchProfilePic(contactId: number, userId: number) {
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(
+			`SELECT c.phone, c.is_group, c.instance_id, c.profile_pic_url, wi.instance_name
+			 FROM contacts c
+			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
+			 WHERE c.id = ? AND c.user_id = ?`,
+			[contactId, userId],
+		);
+		const contact = (rows as any[])[0];
+		if (!contact || !contact.instance_name) return null;
+
+		const jid = contact.is_group
+			? `${contact.phone}@g.us`
+			: `${contact.phone}@s.whatsapp.net`;
+
+		const picUrl = await this.whatsapp.getProfilePicture(contact.instance_name, jid);
+		if (picUrl) {
+			await pool.query(`UPDATE contacts SET profile_pic_url = ? WHERE id = ?`, [picUrl, contactId]);
+		}
+		return picUrl;
+	}
+
+	private async updateProfilePicInBackground(contactId: number, userId: number, instanceName: string, phone: string, isGroup: boolean) {
+		try {
+			const jid = isGroup ? `${phone}@g.us` : `${phone}@s.whatsapp.net`;
+			const picUrl = await this.whatsapp.getProfilePicture(instanceName, jid);
+			if (picUrl) {
+				const pool = this.db.getPool();
+				await pool.query(`UPDATE contacts SET profile_pic_url = ? WHERE id = ?`, [picUrl, contactId]);
+			}
+		} catch {}
+	}
+
 	// ==================== WEBHOOK (Evolution) ====================
 
 	async processIncomingMessage(payload: any) {
@@ -405,12 +441,11 @@ export class CrmService implements OnModuleInit {
 			? (data?.pushName || payload?.data?.groupMetadata?.subject || phone)
 			: pushName;
 
-		// Upsert contact (with pushName from WhatsApp)
+		// Upsert contact (unique key is now user_id + phone + instance_id)
 		await pool.query(
 			`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
 			 VALUES (?, ?, ?, ?, ?, ?, NOW())
 			 ON DUPLICATE KEY UPDATE
-			   instance_id = COALESCE(VALUES(instance_id), instance_id),
 			   name = COALESCE(name, VALUES(name)),
 			   is_group = VALUES(is_group),
 			   last_message_at = NOW(),
@@ -420,11 +455,16 @@ export class CrmService implements OnModuleInit {
 
 		// Get contact ID
 		const [contacts] = await pool.query(
-			`SELECT id FROM contacts WHERE user_id = ? AND phone = ?`,
-			[userId, phone],
+			`SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ?`,
+			[userId, phone, instanceId],
 		);
 		const contact = (contacts as any[])[0];
 		if (!contact) return { ignored: true };
+
+		// Fetch profile pic in background if not yet stored
+		if (!contact.profile_pic_url) {
+			this.updateProfilePicInBackground(contact.id, userId, instanceName, phone, isGroup);
+		}
 
 		// Save message
 		await pool.query(

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Delete, Put, Body, Param, Req, UseGuards } from "@nestjs/common";
 import { WhatsappService } from "./whatsapp.service";
 import { JwtAuthGuard } from "~/auth/jwt-auth.guard";
 
@@ -50,6 +50,11 @@ export class WhatsappController {
 	@Get("instances/:name/groups")
 	async groups(@Param("name") name: string) {
 		return this.whatsappService.getGroups(name);
+	}
+
+	@Put("instances/:id/rename")
+	async rename(@Param("id") id: string, @Body() body: { name: string }) {
+		return this.whatsappService.renameInstance(Number(id), body.name);
 	}
 
 	@Delete("instances/:id/:name")

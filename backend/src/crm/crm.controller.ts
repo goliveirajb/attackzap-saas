@@ -100,6 +100,15 @@ export class CrmController {
 		return this.svc.deleteQuickReply(Number(id), req.user.id);
 	}
 
+	// ==================== PROFILE PICTURE ====================
+
+	@Get("contacts/:id/profile-pic")
+	@UseGuards(JwtAuthGuard)
+	async getProfilePic(@Req() req, @Param("id") id: string) {
+		const url = await this.svc.fetchProfilePic(Number(id), req.user.id);
+		return { url };
+	}
+
 	// ==================== READ STATUS ====================
 
 	@Put("contacts/:id/read")

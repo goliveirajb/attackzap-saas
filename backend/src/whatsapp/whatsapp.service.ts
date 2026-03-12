@@ -256,6 +256,29 @@ export class WhatsappService {
 		}));
 	}
 
+	// Buscar foto de perfil via Evolution API
+	async getProfilePicture(instanceName: string, number: string): Promise<string | null> {
+		try {
+			const res = await fetch(
+				`${this.evolutionUrl}/chat/fetchProfilePictureUrl/${instanceName}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						apikey: this.evolutionKey,
+					},
+					body: JSON.stringify({ number }),
+				},
+			);
+
+			if (!res.ok) return null;
+			const data = await res.json();
+			return data?.profilePictureUrl || data?.picture || data?.url || null;
+		} catch {
+			return null;
+		}
+	}
+
 	// Auto-configurar webhook do CRM ao conectar instancia
 	async autoConfigureCrmWebhook(instanceName: string) {
 		const pool = this.db.getPool();
@@ -299,6 +322,17 @@ export class WhatsappService {
 			[userId],
 		);
 		return rows;
+	}
+
+	// Renomear instancia (apenas display name no banco)
+	async renameInstance(instanceId: number, newName: string) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE whatsapp_instances SET instance_name = ? WHERE id = ?`,
+			[newName, instanceId],
+		);
+		this.logger.log(`Instance ${instanceId} renamed to: ${newName}`);
+		return { ok: true, name: newName };
 	}
 
 	// Deletar instancia
