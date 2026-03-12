@@ -200,15 +200,34 @@ export default function Conversations() {
 
 
 // ======================== CHAT PANEL ========================
-function ChatPanel({ contact, authFetch, onBack }) {
+function ChatPanel({ contact: initialContact, authFetch, onBack }) {
+  const [contact, setContact] = useState(initialContact);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [stages, setStages] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
+
+  // Edit form
+  const [editName, setEditName] = useState(contact.name || "");
+  const [editPhone, setEditPhone] = useState(contact.phone || "");
+  const [editEmail, setEditEmail] = useState(contact.email || "");
+  const [editTags, setEditTags] = useState(contact.tags || "");
+  const [editNotes, setEditNotes] = useState(contact.notes || "");
+  const [editStageId, setEditStageId] = useState(contact.stage_id || null);
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Load stages for the dropdown
+  useEffect(() => {
+    authFetch("/api/crm/stages").then((r) => r.json()).then((d) => {
+      if (Array.isArray(d)) setStages(d);
+    }).catch(() => {});
+  }, []);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -231,6 +250,17 @@ function ChatPanel({ contact, authFetch, onBack }) {
   }, [messages]);
 
   useEffect(() => { inputRef.current?.focus(); }, [contact.id]);
+
+  // Sync edit form when contact changes
+  useEffect(() => {
+    setContact(initialContact);
+    setEditName(initialContact.name || "");
+    setEditPhone(initialContact.phone || "");
+    setEditEmail(initialContact.email || "");
+    setEditTags(initialContact.tags || "");
+    setEditNotes(initialContact.notes || "");
+    setEditStageId(initialContact.stage_id || null);
+  }, [initialContact]);
 
   const handleSend = async () => {
     if (!text.trim() || sending) return;
@@ -264,6 +294,40 @@ function ChatPanel({ contact, authFetch, onBack }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  const handleSaveContact = async () => {
+    if (!editPhone.trim()) return toast.error("Telefone obrigatorio");
+    setSavingContact(true);
+    try {
+      const res = await authFetch(`/api/crm/contacts/${contact.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editName || null,
+          phone: editPhone.trim(),
+          email: editEmail || null,
+          tags: editTags || null,
+          notes: editNotes || null,
+          stage_id: editStageId,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      // Update local contact
+      const stageDef = stages.find((s) => s.id === editStageId);
+      setContact((prev) => ({
+        ...prev,
+        name: editName, phone: editPhone.trim(), email: editEmail,
+        tags: editTags, notes: editNotes, stage_id: editStageId,
+        stage_name: stageDef?.name || prev.stage_name,
+        stage_color: stageDef?.color || prev.stage_color,
+      }));
+      setEditing(false);
+      toast.success("Contato atualizado!");
+    } catch {
+      toast.error("Erro ao salvar");
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
   const groupedMessages = useMemo(() => {
     const groups = [];
     let currentDate = "";
@@ -294,18 +358,24 @@ function ChatPanel({ contact, authFetch, onBack }) {
             <p className="text-[10px] text-gray-500 flex items-center gap-1 truncate">
               <FaWhatsapp size={9} className="text-green-400 flex-shrink-0" />
               {contact.phone}
+              {contact.stage_name && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[8px] font-medium"
+                  style={{ backgroundColor: (contact.stage_color || "#666") + "20", color: contact.stage_color }}>
+                  {contact.stage_name}
+                </span>
+              )}
             </p>
           </div>
         </div>
-        <button onClick={() => setShowInfo(!showInfo)}
-          className={`p-2 rounded-lg transition hidden md:block ${showInfo ? "bg-primary/10 text-primary" : "text-gray-400 hover:text-white"}`}>
+        <button onClick={() => { setShowInfo(!showInfo); setEditing(false); }}
+          className={`p-2 rounded-lg transition ${showInfo ? "bg-primary/10 text-primary" : "text-gray-400 hover:text-white"}`}>
           <FaEllipsisV size={14} />
         </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
-        <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex flex-col ${showInfo ? "hidden md:flex" : "flex"}`}>
           <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3"
             style={{ backgroundImage: "radial-gradient(circle at 20% 50%, rgba(10,111,190,0.03) 0%, transparent 50%)" }}>
             {loading ? (
@@ -381,52 +451,138 @@ function ChatPanel({ contact, authFetch, onBack }) {
           </div>
         </div>
 
-        {/* Info sidebar (desktop only) */}
+        {/* ---- Contact Info / Edit Sidebar ---- */}
         {showInfo && (
-          <div className="hidden md:flex w-72 flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
-            <div className="flex flex-col items-center py-6 border-b border-dark-border">
+          <div className="w-full md:w-80 flex flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
+            {/* Avatar + basic info */}
+            <div className="flex flex-col items-center py-5 border-b border-dark-border">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white font-bold text-xl mb-2">
                 {initials}
               </div>
               <p className="text-white font-semibold">{contact.name || "Sem nome"}</p>
               <p className="text-gray-500 text-xs font-mono mt-0.5">{contact.phone}</p>
-              {contact.stage_name && (
+              {contact.stage_name && !editing && (
                 <span className="mt-2 px-3 py-1 rounded-full text-[10px] font-medium"
                   style={{ backgroundColor: (contact.stage_color || "#666") + "20", color: contact.stage_color }}>
                   {contact.stage_name}
                 </span>
               )}
             </div>
-            <div className="p-4 space-y-3 text-xs">
-              {contact.email && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaEnvelope size={8} className="inline mr-1" />Email</p>
-                  <p className="text-gray-300">{contact.email}</p>
+
+            {/* Toggle edit/view */}
+            {!editing ? (
+              <>
+                {/* View mode */}
+                <div className="p-4 space-y-3 text-xs flex-1">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaPhone size={8} className="inline mr-1" />Telefone</p>
+                    <p className="text-gray-300 font-mono">{contact.phone}</p>
+                  </div>
+                  {contact.email && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaEnvelope size={8} className="inline mr-1" />Email</p>
+                      <p className="text-gray-300">{contact.email}</p>
+                    </div>
+                  )}
+                  {contact.tags && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium mb-1"><FaTags size={8} className="inline mr-1" />Tags</p>
+                      <div className="flex flex-wrap gap-1">
+                        {contact.tags.split(",").map((t, i) => (
+                          <span key={i} className="bg-primary/10 text-primary text-[9px] px-1.5 py-0.5 rounded-full">{t.trim()}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {contact.notes && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaStickyNote size={8} className="inline mr-1" />Observacoes</p>
+                      <p className="text-gray-400 leading-relaxed">{contact.notes}</p>
+                    </div>
+                  )}
+                  {contact.instance_name && (
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaWhatsapp size={8} className="inline mr-1" />Instancia</p>
+                      <p className="text-gray-300">{contact.instance_name}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {contact.tags && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-medium mb-1"><FaTags size={8} className="inline mr-1" />Tags</p>
-                  <div className="flex flex-wrap gap-1">
-                    {contact.tags.split(",").map((t, i) => (
-                      <span key={i} className="bg-primary/10 text-primary text-[9px] px-1.5 py-0.5 rounded-full">{t.trim()}</span>
-                    ))}
+                <div className="p-3 border-t border-dark-border flex gap-2">
+                  <button onClick={() => setEditing(true)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition">
+                    <FaPen size={10} /> Editar Cadastro
+                  </button>
+                  <button onClick={() => setShowInfo(false)}
+                    className="px-3 py-2.5 rounded-xl bg-dark-cardSoft text-gray-400 text-xs hover:bg-dark-cardSoft/80 transition md:hidden">
+                    <FaTimes size={12} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Edit mode */}
+                <div className="p-4 space-y-3 flex-1">
+                  <p className="text-xs font-semibold text-white flex items-center gap-1.5 mb-1">
+                    <FaPen size={10} className="text-primary" /> Editar Cadastro
+                  </p>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Nome</label>
+                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Nome do contato"
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Telefone *</label>
+                    <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="5511999999999"
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Email</label>
+                    <input type="text" value={editEmail} onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Etapa</label>
+                    <select value={editStageId || ""} onChange={(e) => setEditStageId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white focus:outline-none focus:border-primary">
+                      <option value="">Sem etapa</option>
+                      {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Tags</label>
+                    <input type="text" value={editTags} onChange={(e) => setEditTags(e.target.value)}
+                      placeholder="cliente, vip, novo"
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-500 uppercase mb-0.5">Observacoes</label>
+                    <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Anotacoes..." rows={3}
+                      className="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-primary resize-none" />
                   </div>
                 </div>
-              )}
-              {contact.notes && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaStickyNote size={8} className="inline mr-1" />Notas</p>
-                  <p className="text-gray-400 leading-relaxed">{contact.notes}</p>
+
+                <div className="p-3 border-t border-dark-border flex gap-2">
+                  <button onClick={() => setEditing(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-dark-cardSoft text-gray-400 text-xs font-medium hover:bg-dark-cardSoft/80 transition">
+                    Cancelar
+                  </button>
+                  <button onClick={handleSaveContact} disabled={savingContact}
+                    className="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-medium hover:bg-primaryLight disabled:opacity-50 transition">
+                    {savingContact ? "Salvando..." : "Salvar"}
+                  </button>
                 </div>
-              )}
-              {contact.instance_name && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-medium mb-0.5"><FaWhatsapp size={8} className="inline mr-1" />Instancia</p>
-                  <p className="text-gray-300">{contact.instance_name}</p>
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>
