@@ -52,6 +52,7 @@ export default function Conversations() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id or "none"
   const [activeChat, setActiveChat] = useState(null);
   const [lastMessages, setLastMessages] = useState({});
 
@@ -91,13 +92,34 @@ export default function Conversations() {
     return () => clearInterval(iv);
   }, []);
 
+  // Extract unique stages from contacts
+  const stages = useMemo(() => {
+    const map = new Map();
+    contacts.forEach((c) => {
+      if (c.stage_id && c.stage_name) {
+        map.set(c.stage_id, { id: c.stage_id, name: c.stage_name, color: c.stage_color });
+      }
+    });
+    return Array.from(map.values());
+  }, [contacts]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return contacts;
-    const q = search.toLowerCase();
-    return contacts.filter(
-      (c) => (c.name && c.name.toLowerCase().includes(q)) || c.phone.includes(q)
-    );
-  }, [contacts, search]);
+    let list = contacts;
+    // Stage filter
+    if (stageFilter === "none") {
+      list = list.filter((c) => !c.stage_id);
+    } else if (stageFilter !== null) {
+      list = list.filter((c) => c.stage_id === stageFilter);
+    }
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (c) => (c.name && c.name.toLowerCase().includes(q)) || c.phone.includes(q)
+      );
+    }
+    return list;
+  }, [contacts, search, stageFilter]);
 
   const getInitials = (c) =>
     (c.name || c.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -143,7 +165,7 @@ export default function Conversations() {
               <FaWhatsapp className="text-green-400" /> Conversas
             </h1>
             <span className="text-[10px] text-gray-500 bg-dark-cardSoft px-2 py-1 rounded-full">
-              {contacts.length}
+              {stageFilter !== null || search.trim() ? `${filtered.length}/${contacts.length}` : contacts.length}
             </span>
           </div>
           <div className="relative">
@@ -154,6 +176,50 @@ export default function Conversations() {
               className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-dark-cardSoft border border-dark-border text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary"
             />
           </div>
+
+          {/* Stage filter chips */}
+          {stages.length > 0 && (
+            <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setStageFilter(null)}
+                className={`text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                  stageFilter === null
+                    ? "bg-primary text-white"
+                    : "bg-dark-cardSoft text-gray-400 hover:text-white"
+                }`}
+              >
+                Todas
+              </button>
+              {stages.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setStageFilter(stageFilter === s.id ? null : s.id)}
+                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                    stageFilter === s.id
+                      ? "text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                  style={
+                    stageFilter === s.id
+                      ? { backgroundColor: s.color || "#0a6fbe" }
+                      : { backgroundColor: (s.color || "#666") + "15", color: stageFilter === s.id ? "#fff" : s.color }
+                  }
+                >
+                  {s.name}
+                </button>
+              ))}
+              <button
+                onClick={() => setStageFilter(stageFilter === "none" ? null : "none")}
+                className={`text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                  stageFilter === "none"
+                    ? "bg-gray-600 text-white"
+                    : "bg-dark-cardSoft text-gray-500 hover:text-white"
+                }`}
+              >
+                Sem etapa
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Contact list */}
