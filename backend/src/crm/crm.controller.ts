@@ -80,6 +80,26 @@ export class CrmController {
 		return this.svc.deleteContact(Number(id));
 	}
 
+	// ==================== QUICK REPLIES ====================
+
+	@Get("quick-replies")
+	@UseGuards(JwtAuthGuard)
+	async getQuickReplies(@Req() req) {
+		return this.svc.getQuickReplies(req.user.id);
+	}
+
+	@Post("quick-replies")
+	@UseGuards(JwtAuthGuard)
+	async createQuickReply(@Req() req, @Body() body: { title: string; message: string }) {
+		return this.svc.createQuickReply(req.user.id, body.title, body.message);
+	}
+
+	@Delete("quick-replies/:id")
+	@UseGuards(JwtAuthGuard)
+	async deleteQuickReply(@Req() req, @Param("id") id: string) {
+		return this.svc.deleteQuickReply(Number(id), req.user.id);
+	}
+
 	// ==================== READ STATUS ====================
 
 	@Put("contacts/:id/read")

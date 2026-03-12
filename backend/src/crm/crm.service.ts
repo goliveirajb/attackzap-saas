@@ -180,6 +180,32 @@ export class CrmService implements OnModuleInit {
 		await pool.query(`DELETE FROM contacts WHERE id = ?`, [id]);
 	}
 
+	// ==================== QUICK REPLIES ====================
+
+	async getQuickReplies(userId: number) {
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(
+			`SELECT * FROM quick_replies WHERE user_id = ? ORDER BY title ASC`,
+			[userId],
+		);
+		return rows;
+	}
+
+	async createQuickReply(userId: number, title: string, message: string) {
+		const pool = this.db.getPool();
+		const [result] = await pool.query(
+			`INSERT INTO quick_replies (user_id, title, message) VALUES (?, ?, ?)`,
+			[userId, title, message],
+		);
+		return { id: (result as any).insertId, title, message };
+	}
+
+	async deleteQuickReply(id: number, userId: number) {
+		const pool = this.db.getPool();
+		await pool.query(`DELETE FROM quick_replies WHERE id = ? AND user_id = ?`, [id, userId]);
+		return { ok: true };
+	}
+
 	// ==================== READ STATUS ====================
 
 	async markAsRead(userId: number, contactId: number) {
@@ -349,13 +375,15 @@ export class CrmService implements OnModuleInit {
 			? "document"
 			: "text";
 
-		// Skip group messages, status broadcasts, and @lid (linked device) messages
-		if (!remoteJid || remoteJid.includes("@g.us") || remoteJid === "status@broadcast" || remoteJid.includes("@lid")) {
+		// Skip status broadcasts and @lid (linked device) messages
+		if (!remoteJid || remoteJid === "status@broadcast" || remoteJid.includes("@lid")) {
 			return { ignored: true };
 		}
 
-		// Extract phone number from jid (5511999999999@s.whatsapp.net -> 5511999999999)
-		const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@c.us", "");
+		const isGroup = remoteJid.includes("@g.us");
+
+		// Extract phone/group ID from jid
+		const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@c.us", "").replace("@g.us", "");
 
 		// Find instance + user
 		const [instances] = await pool.query(
@@ -372,16 +400,22 @@ export class CrmService implements OnModuleInit {
 		const stages = await this.getStages(userId);
 		const firstStage = (stages as any[])[0];
 
+		// For groups, extract group name from payload
+		const contactName = isGroup
+			? (data?.pushName || payload?.data?.groupMetadata?.subject || phone)
+			: pushName;
+
 		// Upsert contact (with pushName from WhatsApp)
 		await pool.query(
-			`INSERT INTO contacts (user_id, instance_id, phone, name, stage_id, last_message_at)
-			 VALUES (?, ?, ?, ?, ?, NOW())
+			`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
+			 VALUES (?, ?, ?, ?, ?, ?, NOW())
 			 ON DUPLICATE KEY UPDATE
 			   instance_id = COALESCE(VALUES(instance_id), instance_id),
 			   name = COALESCE(name, VALUES(name)),
+			   is_group = VALUES(is_group),
 			   last_message_at = NOW(),
 			   updated_at = NOW()`,
-			[userId, instanceId, phone, pushName, firstStage?.id || null],
+			[userId, instanceId, phone, isGroup ? 1 : 0, contactName, isGroup ? null : (firstStage?.id || null)],
 		);
 
 		// Get contact ID

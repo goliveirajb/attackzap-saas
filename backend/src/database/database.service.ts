@@ -177,6 +177,23 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user' AFTER plan
 		`).catch(() => {});
 
+		// Add is_group column to contacts
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN is_group TINYINT(1) DEFAULT 0 AFTER phone
+		`).catch(() => {});
+
+		// Quick replies table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS quick_replies (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL,
+				title VARCHAR(100) NOT NULL,
+				message TEXT NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`);
+
 		this.logger.log("Tables verified.");
 	}
 }

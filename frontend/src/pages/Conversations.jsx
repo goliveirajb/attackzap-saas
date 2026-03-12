@@ -6,6 +6,7 @@ import {
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
   FaSmile, FaPaperclip, FaStop, FaPlay, FaPause, FaTrash,
+  FaBolt, FaPlus, FaUsers,
 } from "react-icons/fa";
 
 const EMOJI_LIST = [
@@ -52,7 +53,7 @@ export default function Conversations() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id or "none"
+  const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
   const [activeChat, setActiveChat] = useState(null);
   const [lastMessages, setLastMessages] = useState({});
 
@@ -106,8 +107,10 @@ export default function Conversations() {
   const filtered = useMemo(() => {
     let list = contacts;
     // Stage filter
-    if (stageFilter === "none") {
-      list = list.filter((c) => !c.stage_id);
+    if (stageFilter === "groups") {
+      list = list.filter((c) => c.is_group);
+    } else if (stageFilter === "none") {
+      list = list.filter((c) => !c.stage_id && !c.is_group);
     } else if (stageFilter !== null) {
       list = list.filter((c) => c.stage_id === stageFilter);
     }
@@ -178,7 +181,7 @@ export default function Conversations() {
           </div>
 
           {/* Stage filter chips */}
-          {stages.length > 0 && (
+          {(stages.length > 0 || contacts.some((c) => c.is_group)) && (
             <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setStageFilter(null)}
@@ -218,6 +221,16 @@ export default function Conversations() {
               >
                 Sem etapa
               </button>
+              <button
+                onClick={() => setStageFilter(stageFilter === "groups" ? null : "groups")}
+                className={`text-[10px] px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-1 ${
+                  stageFilter === "groups"
+                    ? "bg-green-600 text-white"
+                    : "bg-dark-cardSoft text-gray-500 hover:text-white"
+                }`}
+              >
+                <FaUsers size={8} /> Grupos
+              </button>
             </div>
           )}
         </div>
@@ -252,8 +265,10 @@ export default function Conversations() {
                 >
                   {/* Avatar */}
                   <div className="relative w-12 h-12 flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-primaryDark flex items-center justify-center text-white font-bold text-sm">
-                      {getInitials(c)}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                      c.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary/80 to-primaryDark"
+                    }`}>
+                      {c.is_group ? <FaUsers size={18} /> : getInitials(c)}
                     </div>
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
@@ -330,6 +345,10 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   const [editing, setEditing] = useState(false);
   const [stages, setStages] = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplies, setQuickReplies] = useState([]);
+  const [newQrTitle, setNewQrTitle] = useState("");
+  const [newQrMessage, setNewQrMessage] = useState("");
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -356,6 +375,14 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
       if (Array.isArray(d)) setStages(d);
     }).catch(() => {});
   }, []);
+
+  // Load quick replies
+  const loadQuickReplies = useCallback(() => {
+    authFetch("/api/crm/quick-replies").then((r) => r.json()).then((d) => {
+      if (Array.isArray(d)) setQuickReplies(d);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => { loadQuickReplies(); }, []);
 
   // Mark conversation as read when opening
   useEffect(() => {
@@ -487,6 +514,34 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   const insertEmoji = (emoji) => {
     setText((prev) => prev + emoji);
     inputRef.current?.focus();
+  };
+
+  const selectQuickReply = (qr) => {
+    setText(qr.message);
+    setShowQuickReplies(false);
+    inputRef.current?.focus();
+  };
+
+  const addQuickReply = async () => {
+    if (!newQrTitle.trim() || !newQrMessage.trim()) return;
+    try {
+      const res = await authFetch("/api/crm/quick-replies", {
+        method: "POST",
+        body: JSON.stringify({ title: newQrTitle.trim(), message: newQrMessage.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setNewQrTitle("");
+      setNewQrMessage("");
+      loadQuickReplies();
+      toast.success("Resposta rapida salva!");
+    } catch { toast.error("Erro ao salvar"); }
+  };
+
+  const deleteQuickReply = async (id) => {
+    try {
+      await authFetch(`/api/crm/quick-replies/${id}`, { method: "DELETE" });
+      setQuickReplies((prev) => prev.filter((q) => q.id !== id));
+    } catch { toast.error("Erro ao excluir"); }
   };
 
   // ========== AUDIO RECORDING ==========
@@ -623,11 +678,16 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
             <FaArrowLeft size={14} />
           </button>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            {initials}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
+            contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
+          }`}>
+            {contact.is_group ? <FaUsers size={16} /> : initials}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{contact.name || contact.phone}</p>
+            <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
+              {contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
+              {contact.name || contact.phone}
+            </p>
             <p className="text-[10px] text-gray-500 flex items-center gap-1 truncate">
               <FaWhatsapp size={9} className="text-green-400 flex-shrink-0" />
               {contact.phone}
@@ -735,6 +795,49 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
             </div>
           )}
 
+          {/* Quick Replies Panel */}
+          {showQuickReplies && (
+            <div className="px-3 md:px-4 py-2 bg-dark-card border-t border-dark-border">
+              <div className="max-w-2xl mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold flex items-center gap-1"><FaBolt size={8} /> Respostas Rapidas</p>
+                  <button onClick={() => setShowQuickReplies(false)} className="text-gray-500 hover:text-white"><FaTimes size={10} /></button>
+                </div>
+                {quickReplies.length > 0 ? (
+                  <div className="space-y-1 max-h-40 overflow-y-auto mb-2">
+                    {quickReplies.map((qr) => (
+                      <div key={qr.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-cardSoft hover:bg-dark-cardSoft/80 cursor-pointer group transition"
+                        onClick={() => selectQuickReply(qr)}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-primary font-semibold truncate">{qr.title}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{qr.message}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); deleteQuickReply(qr.id); }}
+                          className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+                          <FaTrash size={9} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-600 mb-2">Nenhuma resposta rapida cadastrada</p>
+                )}
+                {/* Add new */}
+                <div className="flex gap-1.5 items-end">
+                  <input value={newQrTitle} onChange={(e) => setNewQrTitle(e.target.value)} placeholder="Titulo"
+                    className="w-24 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  <input value={newQrMessage} onChange={(e) => setNewQrMessage(e.target.value)} placeholder="Mensagem..."
+                    onKeyDown={(e) => { if (e.key === "Enter") addQuickReply(); }}
+                    className="flex-1 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                  <button onClick={addQuickReply}
+                    className="px-2.5 py-1.5 rounded-lg bg-primary text-white text-[10px] font-medium hover:bg-primaryLight transition flex-shrink-0">
+                    <FaPlus size={9} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Input */}
           <div className="px-3 md:px-4 py-2.5 bg-dark-card border-t border-dark-border">
             <div className="flex items-end gap-1.5 md:gap-2 max-w-2xl mx-auto">
@@ -760,7 +863,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
               ) : (
                 /* Normal input mode */
                 <>
-                  <button onClick={() => setShowEmoji(!showEmoji)}
+                  <button onClick={() => { setShowEmoji(!showEmoji); setShowQuickReplies(false); }}
                     className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
                       showEmoji ? "bg-primary/10 text-primary" : "text-gray-500 hover:text-gray-300"
                     }`} title="Emojis">
@@ -774,6 +877,13 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
                     onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
+
+                  <button onClick={() => { setShowQuickReplies(!showQuickReplies); setShowEmoji(false); }}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                      showQuickReplies ? "bg-yellow-500/10 text-yellow-400" : "text-gray-500 hover:text-gray-300"
+                    }`} title="Respostas rapidas">
+                    <FaBolt size={14} />
+                  </button>
 
                   <div className="flex-1 bg-dark-cardSoft border border-dark-border rounded-2xl px-3 md:px-4 py-2 flex items-end">
                     <textarea
