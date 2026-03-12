@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
-import { FaWhatsapp, FaPlus, FaTrash, FaSync, FaQrcode, FaPen, FaCheck, FaTimes } from "react-icons/fa";
+import { FaWhatsapp, FaPlus, FaTrash, FaSync, FaQrcode, FaPen, FaCheck, FaTimes, FaPlug } from "react-icons/fa";
 
 export default function Instances() {
   const { authFetch } = useAuth();
@@ -135,6 +135,21 @@ export default function Instances() {
     }
   };
 
+  const [fixingWebhook, setFixingWebhook] = useState(null);
+
+  const handleFixWebhook = async (name) => {
+    setFixingWebhook(name);
+    try {
+      const res = await authFetch(`/api/whatsapp/instances/${name}/fix-webhook`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      toast.success(`Webhook reconfigurado para ${name}!`);
+    } catch {
+      toast.error("Erro ao reconfigurar webhook");
+    } finally {
+      setFixingWebhook(null);
+    }
+  };
+
   const statusColor = {
     connected: "bg-green-400",
     connecting: "bg-yellow-400 animate-pulse",
@@ -236,6 +251,16 @@ export default function Instances() {
                     className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold px-3 py-2 rounded-lg hover:bg-primary/20 transition"
                   >
                     <FaQrcode /> QR Code
+                  </button>
+                )}
+                {inst.status === "connected" && (
+                  <button
+                    onClick={() => handleFixWebhook(inst.instance_name)}
+                    disabled={fixingWebhook === inst.instance_name}
+                    className="flex items-center gap-1.5 bg-yellow-500/10 text-yellow-400 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition disabled:opacity-50"
+                    title="Reconfigurar webhook (corrige problemas de recebimento)"
+                  >
+                    <FaPlug /> {fixingWebhook === inst.instance_name ? "Corrigindo..." : "Fix Webhook"}
                   </button>
                 )}
                 <button

@@ -287,27 +287,48 @@ export class WhatsappService {
 		}
 	}
 
+	// Verificar webhook configurado na Evolution
+	async checkWebhook(instanceName: string) {
+		try {
+			const res = await fetch(
+				`${this.evolutionUrl}/webhook/find/${instanceName}`,
+				{
+					method: "GET",
+					headers: { apikey: this.evolutionKey },
+				},
+			);
+			if (!res.ok) {
+				const err = await res.text();
+				return { error: `Evolution returned ${res.status}: ${err}` };
+			}
+			const data = await res.json();
+			return { webhook: data, expectedUrl: `${process.env.API_BASE_URL || ""}/api/crm/webhook` };
+		} catch (err) {
+			return { error: err.message };
+		}
+	}
+
 	// Auto-configurar webhook do CRM ao conectar instancia
-	async autoConfigureCrmWebhook(instanceName: string) {
+	async autoConfigureCrmWebhook(instanceName: string, force = false) {
 		const pool = this.db.getPool();
 
-		// Check if webhook already set for this instance
-		const [rows] = await pool.query(
-			`SELECT webhook_url FROM whatsapp_instances WHERE instance_name = ? OR instance_key = ? LIMIT 1`,
-			[instanceName, instanceName],
-		);
-		const instance = (rows as any[])[0];
 		const baseUrl = process.env.API_BASE_URL || process.env.WEBHOOK_BASE_URL || "";
 
 		if (!baseUrl) {
 			this.logger.warn("API_BASE_URL not set, skipping auto CRM webhook");
-			return;
+			return { error: "API_BASE_URL not configured on server" };
 		}
 
 		const crmWebhookUrl = `${baseUrl}/api/crm/webhook`;
 
-		// Only set if not already configured with our CRM webhook
-		if (instance?.webhook_url === crmWebhookUrl) return;
+		if (!force) {
+			const [rows] = await pool.query(
+				`SELECT webhook_url FROM whatsapp_instances WHERE instance_name = ? OR instance_key = ? LIMIT 1`,
+				[instanceName, instanceName],
+			);
+			const instance = (rows as any[])[0];
+			if (instance?.webhook_url === crmWebhookUrl) return { ok: true, skipped: true, url: crmWebhookUrl };
+		}
 
 		try {
 			await this.setWebhook(instanceName, crmWebhookUrl);
@@ -315,9 +336,11 @@ export class WhatsappService {
 				`UPDATE whatsapp_instances SET webhook_url = ? WHERE instance_name = ? OR instance_key = ?`,
 				[crmWebhookUrl, instanceName, instanceName],
 			);
-			this.logger.log(`CRM webhook auto-configured for ${instanceName}: ${crmWebhookUrl}`);
+			this.logger.log(`CRM webhook configured for ${instanceName}: ${crmWebhookUrl}`);
+			return { ok: true, url: crmWebhookUrl };
 		} catch (err) {
-			this.logger.error(`Failed to auto-configure CRM webhook for ${instanceName}: ${err.message}`);
+			this.logger.error(`Failed to configure CRM webhook for ${instanceName}: ${err.message}`);
+			return { error: err.message };
 		}
 	}
 

@@ -57,6 +57,16 @@ export class WhatsappController {
 		return this.whatsappService.renameInstance(Number(id), body.name);
 	}
 
+	@Get("instances/:name/webhook-check")
+	async webhookCheck(@Param("name") name: string) {
+		return this.whatsappService.checkWebhook(name);
+	}
+
+	@Post("instances/:name/fix-webhook")
+	async fixWebhook(@Param("name") name: string) {
+		return this.whatsappService.autoConfigureCrmWebhook(name, true);
+	}
+
 	@Delete("instances/:id/:name")
 	async remove(@Param("id") id: string, @Param("name") name: string) {
 		return this.whatsappService.deleteInstance(Number(id), name);

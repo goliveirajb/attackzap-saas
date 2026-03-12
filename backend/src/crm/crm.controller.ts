@@ -157,6 +157,13 @@ export class CrmController {
 
 	@Post("webhook")
 	async webhook(@Body() body: any) {
+		console.log("[CRM WEBHOOK] Received:", JSON.stringify({
+			event: body?.event,
+			instance: body?.instance,
+			remoteJid: body?.data?.key?.remoteJid,
+			fromMe: body?.data?.key?.fromMe,
+			hasData: !!body?.data,
+		}));
 		return this.svc.processIncomingMessage(body);
 	}
 }
