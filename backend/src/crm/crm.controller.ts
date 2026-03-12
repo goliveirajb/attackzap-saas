@@ -161,6 +161,12 @@ export class CrmController {
 		return { ok: true, message: "CRM webhook endpoint is reachable", timestamp: new Date().toISOString() };
 	}
 
+	// Debug endpoint (public) - shows DB instances vs Evolution instances
+	@Get("debug/instances")
+	async debugInstances() {
+		return this.svc.debugInstances();
+	}
+
 	@Post("webhook")
 	async webhook(@Body() body: any) {
 		console.log("[CRM WEBHOOK] Received:", JSON.stringify({

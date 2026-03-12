@@ -380,6 +380,12 @@ export class CrmService implements OnModuleInit {
 		} catch {}
 	}
 
+	// ==================== DEBUG ====================
+
+	async debugInstances() {
+		return this.whatsapp.debugInstances();
+	}
+
 	// ==================== WEBHOOK (Evolution) ====================
 
 	async processIncomingMessage(payload: any) {
