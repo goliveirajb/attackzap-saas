@@ -11,41 +11,55 @@ import {
   FaComments,
   FaBars,
   FaTimes,
+  FaUserShield,
 } from "react-icons/fa";
 
-const menuSections = [
-  {
-    label: "GERAL",
-    links: [
-      { to: "/", label: "Dashboard", icon: FaHome },
-    ],
-  },
-  {
-    label: "CRM",
-    links: [
-      { to: "/conversations", label: "Conversas", icon: FaComments },
-      { to: "/crm", label: "Contatos", icon: FaUsers },
-    ],
-  },
-  {
-    label: "WHATSAPP",
-    links: [
-      { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
-    ],
-  },
-  {
-    label: "AUTOMACOES",
-    links: [
-      { to: "/flows", label: "Fluxos", icon: FaProjectDiagram },
-    ],
-  },
-  {
-    label: "SISTEMA",
-    links: [
-      { to: "/settings", label: "Configuracoes", icon: FaCog },
-    ],
-  },
-];
+const getMenuSections = (role) => {
+  const sections = [
+    {
+      label: "GERAL",
+      links: [
+        { to: "/", label: "Dashboard", icon: FaHome },
+      ],
+    },
+    {
+      label: "CRM",
+      links: [
+        { to: "/conversations", label: "Conversas", icon: FaComments },
+        { to: "/crm", label: "Contatos", icon: FaUsers },
+      ],
+    },
+    {
+      label: "WHATSAPP",
+      links: [
+        { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
+      ],
+    },
+    {
+      label: "AUTOMACOES",
+      links: [
+        { to: "/flows", label: "Fluxos", icon: FaProjectDiagram },
+      ],
+    },
+    {
+      label: "SISTEMA",
+      links: [
+        { to: "/settings", label: "Configuracoes", icon: FaCog },
+      ],
+    },
+  ];
+
+  if (role === "admin") {
+    sections.push({
+      label: "ADMIN",
+      links: [
+        { to: "/admin", label: "Gerenciar Clientes", icon: FaUserShield },
+      ],
+    });
+  }
+
+  return sections;
+};
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -86,7 +100,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 p-3 overflow-y-auto">
-          {menuSections.map((section) => (
+          {getMenuSections(user?.role).map((section) => (
             <div key={section.label} className="mb-4">
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-4 mb-2">
                 {section.label}

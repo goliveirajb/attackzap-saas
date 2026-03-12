@@ -86,6 +86,13 @@ export default function Login() {
         >
           {isRegister ? "Ja tem conta? Entrar" : "Nao tem conta? Registrar"}
         </button>
+
+        <button
+          onClick={() => navigate("/home")}
+          className="w-full text-center text-xs text-gray-500 hover:text-primary mt-2 transition"
+        >
+          Ver planos e precos
+        </button>
       </div>
     </div>
   );

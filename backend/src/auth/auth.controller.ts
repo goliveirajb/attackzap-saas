@@ -6,9 +6,9 @@ export class AuthController {
 	constructor(private readonly authService: AuthService) {}
 
 	@Post("register")
-	async register(@Body() body: { name: string; email: string; password: string }) {
+	async register(@Body() body: { name: string; email: string; password: string; plan?: string }) {
 		try {
-			return await this.authService.register(body.name, body.email, body.password);
+			return await this.authService.register(body.name, body.email, body.password, body.plan);
 		} catch (err) {
 			throw new HttpException(
 				err.message || "Erro ao registrar",

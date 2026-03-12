@@ -27,11 +27,11 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
+  const register = useCallback(async (name, email, password, plan) => {
     const res = await fetch(`${API}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, plan }),
     });
     if (!res.ok) throw new Error("Erro ao registrar");
     const data = await res.json();

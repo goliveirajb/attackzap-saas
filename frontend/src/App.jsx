@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Layout from "./components/Layout";
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Instances from "./pages/Instances";
@@ -8,6 +9,7 @@ import Automations from "./pages/Automations";
 import CRM from "./pages/CRM";
 import Conversations from "./pages/Conversations";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
@@ -17,6 +19,7 @@ function PrivateRoute({ children }) {
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/home" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route
         path="/"
@@ -33,6 +36,7 @@ function AppRoutes() {
         <Route path="flows" element={<Automations />} />
         <Route path="automations" element={<Automations />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="admin" element={<Admin />} />
       </Route>
     </Routes>
   );

@@ -7,6 +7,7 @@ import { WhatsappModule } from "./whatsapp/whatsapp.module";
 import { AutomationsModule } from "./automations/automations.module";
 import { N8nModule } from "./n8n/n8n.module";
 import { CrmModule } from "./crm/crm.module";
+import { AdminModule } from "./admin/admin.module";
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { CrmModule } from "./crm/crm.module";
 		AutomationsModule,
 		N8nModule,
 		CrmModule,
+		AdminModule,
 	],
 })
 export class AppModule {}

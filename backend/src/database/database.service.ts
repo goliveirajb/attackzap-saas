@@ -149,9 +149,14 @@ export class DatabaseService implements OnModuleInit {
 			)
 		`);
 
-		// Migrations - adicionar novos tipos ao ENUM
+		// Migrations
 		await pool.query(`
 			ALTER TABLE automations MODIFY COLUMN type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message'
+		`).catch(() => {});
+
+		// Add role column to users
+		await pool.query(`
+			ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user' AFTER plan
 		`).catch(() => {});
 
 		this.logger.log("Tables verified.");
