@@ -18,21 +18,21 @@ services:
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - N8N_API_URL=${N8N_API_URL}
       - N8N_API_KEY=${N8N_API_KEY}
+      - API_BASE_URL=${API_BASE_URL}
       - PORT=3001
     networks:
       - attackzap
 
-  frontend:
-    build: ./frontend
-    container_name: attackzap-frontend
-    restart: always
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend
-    networks:
-      - attackzap
-
-networks:
-  attackzap:
-    driver: bridge
+frontend:
+  build:
+    context: ./frontend
+    args:
+      API_BASE_URL: ${API_BASE_URL}
+  container_name: attackzap-frontend
+  restart: always
+  ports:
+    - "8080:80"
+  depends_on:
+    - backend
+  networks:
+    - attackzap
