@@ -1,11 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { DatabaseService } from "~/database/database.service";
+import { WhatsappService } from "~/whatsapp/whatsapp.service";
 
 @Injectable()
 export class CrmService implements OnModuleInit {
 	private readonly logger = new Logger(CrmService.name);
 
-	constructor(private readonly db: DatabaseService) {}
+	constructor(
+		private readonly db: DatabaseService,
+		private readonly whatsapp: WhatsappService,
+	) {}
 
 	async onModuleInit() {
 		// Seed default stages for users who don't have any
@@ -176,6 +180,40 @@ export class CrmService implements OnModuleInit {
 			[contactId, limit],
 		);
 		return (rows as any[]).reverse();
+	}
+
+	// ==================== SEND MESSAGE ====================
+
+	async sendMessage(userId: number, contactId: number, text: string) {
+		const pool = this.db.getPool();
+
+		// Get contact with instance info
+		const [rows] = await pool.query(
+			`SELECT c.*, wi.instance_name
+			 FROM contacts c
+			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
+			 WHERE c.id = ? AND c.user_id = ?`,
+			[contactId, userId],
+		);
+		const contact = (rows as any[])[0];
+		if (!contact) throw new Error("Contato nao encontrado");
+		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
+
+		// Send via Evolution
+		await this.whatsapp.sendText(contact.instance_name, contact.phone, text);
+
+		// Save to DB
+		await pool.query(
+			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name)
+			 VALUES (?, ?, 'outgoing', ?, 'text', ?, ?)`,
+			[contactId, userId, text, `${contact.phone}@s.whatsapp.net`, contact.instance_name],
+		);
+
+		// Update last_message_at
+		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
+
+		this.logger.log(`Message sent to ${contact.phone} via ${contact.instance_name}`);
+		return { ok: true };
 	}
 
 	// ==================== WEBHOOK (Evolution) ====================

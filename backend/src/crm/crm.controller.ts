@@ -84,6 +84,12 @@ export class CrmController {
 		return this.svc.getMessages(Number(id), Number(limit) || 50);
 	}
 
+	@Post("contacts/:id/send")
+	@UseGuards(JwtAuthGuard)
+	async sendMessage(@Req() req, @Param("id") id: string, @Body() body: { text: string }) {
+		return this.svc.sendMessage(req.user.id, Number(id), body.text);
+	}
+
 	// ==================== WEBHOOK (public - called by Evolution) ====================
 
 	@Post("webhook")
