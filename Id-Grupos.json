@@ -1,0 +1,72 @@
+{
+  "name": "Id-Grupos",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://evo.attackzap.com/group/fetchAllGroups/Resultados",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "getParticipants",
+              "value": "false"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "E61262967CD6-4D7B-84EF-16235D88083D"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        192
+      ],
+      "id": "22ac4b3b-36dc-4ce6-81b6-84117a8f365a",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        528,
+        208
+      ],
+      "id": "da6ce025-c6ef-4453-a406-f74152ee3775",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e5ec5808-30b2-4edf-8466-4b64b736711f",
+  "meta": {
+    "instanceId": "68e5f56b1f4b624b7a9f7e6b2c2e71543b3bfa26a570d41061a6b8506afa9aea"
+  },
+  "id": "2BeBAHR05y0moprv",
+  "tags": []
+}

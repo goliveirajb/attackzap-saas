@@ -1,0 +1,244 @@
+{
+  "name": "Mensagem-Programada",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "814fa559-b907-42d5-9097-f63bd13b2983",
+              "leftValue": "={{ ($json.media || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -928,
+        704
+      ],
+      "id": "e88518b2-e4e5-49bd-acd0-003bbad6a027",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Resultados",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        704
+      ],
+      "id": "1086cb98-a784-483c-baec-fcb9a86c1d9f",
+      "name": "Webhook",
+      "webhookId": "ef3a57e3-a61f-41f8-a831-85bed488a1c4",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "42Mm4kEHsHtt1RaM",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "=Resultados",
+        "remoteJid": "={{$json['number']}}",
+        "messageText": "={{$json['text']}}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        816
+      ],
+      "id": "968589ef-0e5d-42e6-82e3-db8bf51c251c",
+      "name": "Enviar texto",
+      "credentials": {
+        "evolutionApi": {
+          "id": "0cmGzQL2e9PEtwBd",
+          "name": "Evolution account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f6ad145f-36de-44e1-93f2-0cfd68dacdfb",
+              "name": "number",
+              "value": "={{ $json.body.number || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d0047d35-9d3e-4027-879c-684adc9da87c",
+              "name": "text",
+              "value": "={{ $json.body.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "2607f5d0-0b2f-4639-a61a-85c46e5f93c9",
+              "name": "caption",
+              "value": "={{ $json.body.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "df5b1aac-317b-42fa-89d8-7e8c9435b9a4",
+              "name": "media",
+              "value": "={{ $json.body.media || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1136,
+        704
+      ],
+      "id": "94b12f47-abd3-41fd-be95-0570e725a053",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\":\"sucesso\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -192,
+        704
+      ],
+      "id": "450cf68c-1d38-4e62-86f7-ab464faa366e",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-image",
+        "instanceName": "Resultados",
+        "remoteJid": "={{$json['number']}}",
+        "media": "={{ ($json.media || '').replace(/^data:[^,]+,/, '').replace(/\\s/g, '') }}",
+        "caption": "={{$json.caption}}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        640
+      ],
+      "id": "21c0e7f6-7b54-4b14-9e26-42c9aa347df8",
+      "name": "Enviar imagem1",
+      "credentials": {
+        "evolutionApi": {
+          "id": "0cmGzQL2e9PEtwBd",
+          "name": "Evolution account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Enviar imagem1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar imagem1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "629e407e-4257-4e4b-bac3-d8347f3d539b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68e5f56b1f4b624b7a9f7e6b2c2e71543b3bfa26a570d41061a6b8506afa9aea"
+  },
+  "id": "AH8gSs10hcWga1uQ",
+  "tags": []
+}
