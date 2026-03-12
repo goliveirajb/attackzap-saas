@@ -196,10 +196,62 @@ export class CrmService implements OnModuleInit {
 	async getMessages(contactId: number, limit = 50) {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
-			`SELECT * FROM contact_messages WHERE contact_id = ? ORDER BY created_at DESC LIMIT ?`,
+			`SELECT id, contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, created_at,
+			 CASE
+			   WHEN message_type IN ('image','video','audio','document') AND raw_data IS NOT NULL THEN 1
+			   ELSE 0
+			 END as has_media
+			 FROM contact_messages WHERE contact_id = ? ORDER BY created_at DESC LIMIT ?`,
 			[contactId, limit],
 		);
 		return (rows as any[]).reverse();
+	}
+
+	async getMessageMedia(messageId: number, userId: number) {
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(
+			`SELECT cm.raw_data, cm.message_type, cm.direction
+			 FROM contact_messages cm
+			 WHERE cm.id = ? AND cm.user_id = ?`,
+			[messageId, userId],
+		);
+		const msg = (rows as any[])[0];
+		if (!msg || !msg.raw_data) return null;
+
+		const raw = typeof msg.raw_data === "string" ? JSON.parse(msg.raw_data) : msg.raw_data;
+
+		// Outgoing: base64 stored directly
+		if (raw.media_base64) {
+			return { base64: raw.media_base64, type: msg.message_type };
+		}
+
+		// Incoming from Evolution webhook: extract base64 from message object
+		const msgObj = raw.message || raw;
+		let base64 = null;
+		let mimetype = null;
+
+		if (msg.message_type === "image" && msgObj.imageMessage) {
+			base64 = msgObj.imageMessage.base64 || msgObj.base64;
+			mimetype = msgObj.imageMessage.mimetype || "image/jpeg";
+		} else if (msg.message_type === "video" && msgObj.videoMessage) {
+			base64 = msgObj.videoMessage.base64 || msgObj.base64;
+			mimetype = msgObj.videoMessage.mimetype || "video/mp4";
+		} else if (msg.message_type === "audio" && msgObj.audioMessage) {
+			base64 = msgObj.audioMessage.base64 || msgObj.base64;
+			mimetype = msgObj.audioMessage.mimetype || "audio/ogg";
+		} else if (msg.message_type === "document" && msgObj.documentMessage) {
+			base64 = msgObj.documentMessage.base64 || msgObj.base64;
+			mimetype = msgObj.documentMessage.mimetype || "application/octet-stream";
+		}
+
+		if (!base64) return null;
+
+		// If base64 doesn't have data URI prefix, add it
+		if (!base64.startsWith("data:")) {
+			base64 = `data:${mimetype};base64,${base64}`;
+		}
+
+		return { base64, type: msg.message_type };
 	}
 
 	// ==================== SEND MESSAGE ====================
@@ -251,13 +303,13 @@ export class CrmService implements OnModuleInit {
 		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
 
 		// Send via Evolution
-		await this.whatsapp.sendMedia(contact.instance_name, contact.phone, base64, caption);
+		await this.whatsapp.sendMedia(contact.instance_name, contact.phone, base64, caption, mediaType);
 
-		// Save to DB
+		// Save to DB (store base64 in raw_data so we can display it later)
 		await pool.query(
-			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name)
-			 VALUES (?, ?, 'outgoing', ?, ?, ?, ?)`,
-			[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name],
+			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
+			 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
+			[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name, JSON.stringify({ media_base64: base64 })],
 		);
 
 		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);

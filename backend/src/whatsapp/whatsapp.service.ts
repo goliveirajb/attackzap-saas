@@ -182,8 +182,13 @@ export class WhatsappService {
 		return await res.json();
 	}
 
-	// Enviar media (imagem com caption)
-	async sendMedia(instanceName: string, number: string, mediaBase64: string, caption: string) {
+	// Enviar media (imagem, video, audio, documento)
+	async sendMedia(instanceName: string, number: string, mediaBase64: string, caption: string, mediatype: string = "image") {
+		// Audio uses sendWhatsAppAudio endpoint for proper voice note format
+		if (mediatype === "audio") {
+			return this.sendAudio(instanceName, number, mediaBase64);
+		}
+
 		const res = await fetch(
 			`${this.evolutionUrl}/message/sendMedia/${instanceName}`,
 			{
@@ -194,7 +199,7 @@ export class WhatsappService {
 				},
 				body: JSON.stringify({
 					number,
-					mediatype: "image",
+					mediatype,
 					media: mediaBase64,
 					caption,
 				}),
@@ -202,6 +207,27 @@ export class WhatsappService {
 		);
 
 		if (!res.ok) throw new Error("Falha ao enviar media");
+		return await res.json();
+	}
+
+	// Enviar audio como voice note (PTT)
+	async sendAudio(instanceName: string, number: string, audioBase64: string) {
+		const res = await fetch(
+			`${this.evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					apikey: this.evolutionKey,
+				},
+				body: JSON.stringify({
+					number,
+					audio: audioBase64,
+				}),
+			},
+		);
+
+		if (!res.ok) throw new Error("Falha ao enviar audio");
 		return await res.json();
 	}
 

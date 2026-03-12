@@ -96,6 +96,14 @@ export class CrmController {
 		return this.svc.getMessages(Number(id), Number(limit) || 50);
 	}
 
+	@Get("messages/:id/media")
+	@UseGuards(JwtAuthGuard)
+	async getMessageMedia(@Req() req, @Param("id") id: string) {
+		const media = await this.svc.getMessageMedia(Number(id), req.user.id);
+		if (!media) return { error: "Media not found" };
+		return media;
+	}
+
 	@Post("contacts/:id/send")
 	@UseGuards(JwtAuthGuard)
 	async sendMessage(@Req() req, @Param("id") id: string, @Body() body: { text: string }) {

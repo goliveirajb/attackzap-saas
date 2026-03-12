@@ -5,7 +5,7 @@ import {
   FaWhatsapp, FaSearch, FaSpinner, FaPaperPlane, FaCheck, FaCheckDouble,
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
-  FaSmile, FaPaperclip,
+  FaSmile, FaPaperclip, FaStop, FaPlay, FaPause, FaTrash,
 } from "react-icons/fa";
 
 const EMOJI_LIST = [
@@ -102,7 +102,13 @@ export default function Conversations() {
   const getInitials = (c) =>
     (c.name || c.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
-  const openChat = (c) => setActiveChat(c);
+  const openChat = (c) => {
+    setActiveChat(c);
+    // Zero unread locally immediately (like WhatsApp)
+    if (Number(c.unread_count) > 0) {
+      setContacts((prev) => prev.map((ct) => ct.id === c.id ? { ...ct, unread_count: 0 } : ct));
+    }
+  };
   const closeChat = () => { setActiveChat(null); load(); };
 
   // Total unread count for parent components
@@ -244,6 +250,11 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   const [stages, setStages] = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -397,6 +408,84 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     inputRef.current?.focus();
   };
 
+  // ========== AUDIO RECORDING ==========
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(recordingTimerRef.current);
+        setRecordingTime(0);
+
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (blob.size < 1000) return; // too short, discard
+
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+
+        // Send audio
+        setUploadingMedia(true);
+        const toastId = toast.loading("Enviando audio...");
+        try {
+          const res = await authFetch(`/api/crm/contacts/${contact.id}/send-media`, {
+            method: "POST",
+            body: JSON.stringify({ base64, caption: "", mediaType: "audio" }),
+          });
+          toast.dismiss(toastId);
+          if (!res.ok) throw new Error();
+          toast.success("Audio enviado!");
+          loadMessages();
+        } catch {
+          toast.dismiss(toastId);
+          toast.error("Erro ao enviar audio");
+        } finally {
+          setUploadingMedia(false);
+        }
+      };
+
+      mediaRecorder.start(250);
+      setRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+    } catch {
+      toast.error("Permissao de microfone negada");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current.stream?.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    clearInterval(recordingTimerRef.current);
+    setRecording(false);
+    setRecordingTime(0);
+    audioChunksRef.current = [];
+  };
+
+  const formatRecTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
   const handleSaveContact = async () => {
     if (!editPhone.trim()) return toast.error("Telefone obrigatorio");
     setSavingContact(true);
@@ -505,6 +594,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                     );
                   }
                   const isOut = item.direction === "outgoing";
+                  const isMedia = ["image", "video", "audio"].includes(item.message_type) && item.has_media;
                   return (
                     <div key={item.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[85%] md:max-w-[70%] px-3 py-2 rounded-2xl ${
@@ -512,10 +602,31 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                           ? "bg-primary/90 text-white rounded-br-md"
                           : "bg-dark-card text-gray-200 rounded-bl-md border border-dark-border/50"
                       }`}>
-                        <p className="text-[13px] leading-relaxed break-words whitespace-pre-wrap">
-                          {msgTypeIcon(item.message_type)}
-                          {item.message_text || `[${item.message_type}]`}
-                        </p>
+                        {/* Media content */}
+                        {isMedia && item.message_type === "image" && (
+                          <MediaImage msgId={item.id} authFetch={authFetch} />
+                        )}
+                        {isMedia && item.message_type === "video" && (
+                          <MediaVideo msgId={item.id} authFetch={authFetch} />
+                        )}
+                        {isMedia && item.message_type === "audio" && (
+                          <MediaAudio msgId={item.id} authFetch={authFetch} isOut={isOut} />
+                        )}
+                        {/* Text content */}
+                        {(() => {
+                          const txt = item.message_text;
+                          const isBracketOnly = txt === `[${item.message_type}]`;
+                          if (isMedia && (!txt || isBracketOnly)) return null;
+                          if (isMedia && txt && !isBracketOnly) return (
+                            <p className="text-[13px] leading-relaxed break-words whitespace-pre-wrap">{txt}</p>
+                          );
+                          return (
+                            <p className="text-[13px] leading-relaxed break-words whitespace-pre-wrap">
+                              {item.message_type !== "text" && msgTypeIcon(item.message_type)}
+                              {txt || `[${item.message_type}]`}
+                            </p>
+                          );
+                        })()}
                         <div className={`flex items-center justify-end gap-1 mt-0.5 ${isOut ? "text-white/50" : "text-gray-500"}`}>
                           <span className="text-[9px]">{formatTime(item.created_at)}</span>
                           {isOut && (item._sending ? <FaCheck size={7} className="text-white/30" /> : <FaCheckDouble size={7} />)}
@@ -546,40 +657,70 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           {/* Input */}
           <div className="px-3 md:px-4 py-2.5 bg-dark-card border-t border-dark-border">
             <div className="flex items-end gap-1.5 md:gap-2 max-w-2xl mx-auto">
-              <button onClick={() => setShowEmoji(!showEmoji)}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
-                  showEmoji ? "bg-primary/10 text-primary" : "text-gray-500 hover:text-gray-300"
-                }`} title="Emojis">
-                <FaSmile size={16} />
-              </button>
+              {recording ? (
+                /* Recording mode */
+                <>
+                  <button onClick={cancelRecording}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-red-400 hover:text-red-300 transition flex-shrink-0"
+                    title="Cancelar">
+                    <FaTrash size={14} />
+                  </button>
+                  <div className="flex-1 flex items-center gap-3 bg-dark-cardSoft border border-red-500/30 rounded-2xl px-4 py-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                    <span className="text-sm text-red-400 font-mono">{formatRecTime(recordingTime)}</span>
+                    <span className="text-xs text-gray-500">Gravando...</span>
+                  </div>
+                  <button onClick={stopRecording}
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-400 text-white shadow-lg shadow-green-500/30 transition-all flex-shrink-0"
+                    title="Enviar audio">
+                    <FaPaperPlane size={13} />
+                  </button>
+                </>
+              ) : (
+                /* Normal input mode */
+                <>
+                  <button onClick={() => setShowEmoji(!showEmoji)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                      showEmoji ? "bg-primary/10 text-primary" : "text-gray-500 hover:text-gray-300"
+                    }`} title="Emojis">
+                    <FaSmile size={16} />
+                  </button>
 
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 transition flex-shrink-0"
-                title="Enviar imagem ou video">
-                <FaPaperclip size={15} />
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
-                onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 transition flex-shrink-0"
+                    title="Enviar imagem ou video">
+                    <FaPaperclip size={15} />
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                    onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
 
-              <div className="flex-1 bg-dark-cardSoft border border-dark-border rounded-2xl px-3 md:px-4 py-2 flex items-end">
-                <textarea
-                  ref={inputRef} value={text}
-                  onChange={(e) => { setText(e.target.value); setShowEmoji(false); }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Mensagem..."
-                  rows={1}
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-600 focus:outline-none resize-none max-h-28"
-                  style={{ minHeight: "20px" }}
-                  onInput={(e) => { e.target.style.height = "20px"; e.target.style.height = Math.min(e.target.scrollHeight, 112) + "px"; }}
-                />
-              </div>
+                  <div className="flex-1 bg-dark-cardSoft border border-dark-border rounded-2xl px-3 md:px-4 py-2 flex items-end">
+                    <textarea
+                      ref={inputRef} value={text}
+                      onChange={(e) => { setText(e.target.value); setShowEmoji(false); }}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Mensagem..."
+                      rows={1}
+                      className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-600 focus:outline-none resize-none max-h-28"
+                      style={{ minHeight: "20px" }}
+                      onInput={(e) => { e.target.style.height = "20px"; e.target.style.height = Math.min(e.target.scrollHeight, 112) + "px"; }}
+                    />
+                  </div>
 
-              <button onClick={handleSend} disabled={(!text.trim() && !uploadingMedia) || sending}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-                  text.trim() ? "bg-primary hover:bg-primaryLight text-white shadow-lg shadow-primary/30" : "bg-dark-cardSoft text-gray-600"
-                }`}>
-                {sending || uploadingMedia ? <FaSpinner className="animate-spin" size={13} /> : <FaPaperPlane size={13} />}
-              </button>
+                  {text.trim() ? (
+                    <button onClick={handleSend} disabled={sending}
+                      className="w-10 h-10 rounded-full flex items-center justify-center bg-primary hover:bg-primaryLight text-white shadow-lg shadow-primary/30 transition-all flex-shrink-0">
+                      {sending ? <FaSpinner className="animate-spin" size={13} /> : <FaPaperPlane size={13} />}
+                    </button>
+                  ) : (
+                    <button onClick={startRecording} disabled={uploadingMedia}
+                      className="w-10 h-10 rounded-full flex items-center justify-center bg-dark-cardSoft text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-all flex-shrink-0"
+                      title="Gravar audio">
+                      {uploadingMedia ? <FaSpinner className="animate-spin" size={13} /> : <FaMicrophone size={16} />}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -720,5 +861,79 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
         )}
       </div>
     </>
+  );
+}
+
+
+// ======================== MEDIA COMPONENTS ========================
+
+function MediaImage({ msgId, authFetch }) {
+  const [src, setSrc] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch(`/api/crm/messages/${msgId}/media`).then((r) => r.json()).then((data) => {
+      if (!cancelled && data?.base64) setSrc(data.base64);
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [msgId]);
+
+  if (loading) return <div className="w-48 h-32 rounded-xl bg-dark-cardSoft/50 animate-pulse flex items-center justify-center mb-1"><FaImage className="text-gray-600" /></div>;
+  if (!src) return <p className="text-[13px] text-gray-400 flex items-center gap-1 mb-1"><FaImage size={12} /> [imagem]</p>;
+
+  return (
+    <>
+      <img src={src} alt="" onClick={() => setFullscreen(true)}
+        className="max-w-full max-h-60 rounded-xl mb-1 cursor-pointer hover:opacity-90 transition" />
+      {fullscreen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4" onClick={() => setFullscreen(false)}>
+          <img src={src} alt="" className="max-w-full max-h-full object-contain rounded-lg" />
+          <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setFullscreen(false)}>
+            <FaTimes size={24} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function MediaVideo({ msgId, authFetch }) {
+  const [src, setSrc] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch(`/api/crm/messages/${msgId}/media`).then((r) => r.json()).then((data) => {
+      if (!cancelled && data?.base64) setSrc(data.base64);
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [msgId]);
+
+  if (loading) return <div className="w-48 h-32 rounded-xl bg-dark-cardSoft/50 animate-pulse flex items-center justify-center mb-1"><FaVideo className="text-gray-600" /></div>;
+  if (!src) return <p className="text-[13px] text-gray-400 flex items-center gap-1 mb-1"><FaVideo size={12} /> [video]</p>;
+
+  return <video src={src} controls className="max-w-full max-h-60 rounded-xl mb-1" />;
+}
+
+function MediaAudio({ msgId, authFetch, isOut }) {
+  const [src, setSrc] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    authFetch(`/api/crm/messages/${msgId}/media`).then((r) => r.json()).then((data) => {
+      if (!cancelled && data?.base64) setSrc(data.base64);
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [msgId]);
+
+  if (loading) return <div className="w-48 h-10 rounded-xl bg-dark-cardSoft/50 animate-pulse flex items-center justify-center mb-1"><FaMicrophone className="text-gray-600" size={12} /></div>;
+  if (!src) return <p className="text-[13px] text-gray-400 flex items-center gap-1 mb-1"><FaMicrophone size={12} /> [audio]</p>;
+
+  return (
+    <audio src={src} controls className={`max-w-[240px] h-10 mb-1 ${isOut ? "[&::-webkit-media-controls-panel]:bg-primary/30" : ""}`}
+      style={{ filter: isOut ? "invert(0)" : "none" }} />
   );
 }
