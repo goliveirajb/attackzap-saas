@@ -1020,51 +1020,55 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
               ) : (
                 /* Normal input mode */
                 <>
-                  <button onClick={() => { setShowEmoji(!showEmoji); setShowQuickReplies(false); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
-                      showEmoji ? "bg-primary/10 text-primary" : "text-gray-500 hover:text-gray-300"
-                    }`} title="Emojis">
-                    <FaSmile size={16} />
-                  </button>
+                  <div className="flex-1 bg-dark-cardSoft rounded-2xl px-2 md:px-3 py-1.5 flex items-end gap-1">
+                    <button onClick={() => { setShowEmoji(!showEmoji); setShowQuickReplies(false); }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                        showEmoji ? "text-primary" : "text-gray-500 hover:text-gray-300"
+                      }`} title="Emojis">
+                      <FaSmile size={20} />
+                    </button>
 
-                  <button onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 transition flex-shrink-0"
-                    title="Enviar imagem ou video">
-                    <FaPaperclip size={15} />
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
-                    onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
+                    <button onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 transition flex-shrink-0"
+                      title="Enviar imagem ou video">
+                      <FaPaperclip size={18} />
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                      onChange={(e) => { if (e.target.files[0]) handleMediaUpload(e.target.files[0]); e.target.value = ""; }} />
 
-                  <button onClick={() => { setShowQuickReplies(!showQuickReplies); setShowEmoji(false); }}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition flex-shrink-0 ${
-                      showQuickReplies ? "bg-yellow-500/10 text-yellow-400" : "text-gray-500 hover:text-gray-300"
-                    }`} title="Respostas rapidas">
-                    <FaBolt size={14} />
-                  </button>
+                    <button onClick={() => { setShowQuickReplies(!showQuickReplies); setShowEmoji(false); }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                        showQuickReplies ? "text-yellow-400" : "text-gray-500 hover:text-gray-300"
+                      }`} title="Respostas rapidas">
+                      <FaBolt size={16} />
+                    </button>
 
-                  <div className="flex-1 bg-dark-cardSoft border border-dark-border rounded-2xl px-3 md:px-4 py-2 flex items-end">
                     <textarea
                       ref={inputRef} value={text}
                       onChange={(e) => { setText(e.target.value); setShowEmoji(false); }}
                       onKeyDown={handleKeyDown}
                       placeholder="Mensagem..."
                       rows={1}
-                      className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-600 focus:outline-none resize-none max-h-28"
-                      style={{ minHeight: "20px" }}
-                      onInput={(e) => { e.target.style.height = "20px"; e.target.style.height = Math.min(e.target.scrollHeight, 112) + "px"; }}
+                      className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none resize-none max-h-28 py-1.5"
+                      style={{ minHeight: "24px" }}
+                      onInput={(e) => { e.target.style.height = "24px"; e.target.style.height = Math.min(e.target.scrollHeight, 112) + "px"; }}
                     />
                   </div>
 
                   {text.trim() ? (
-                    <button onClick={handleSend} disabled={sending}
-                      className="w-10 h-10 rounded-full flex items-center justify-center bg-primary hover:bg-primaryLight text-white shadow-lg shadow-primary/30 transition-all flex-shrink-0">
-                      {sending ? <FaSpinner className="animate-spin" size={13} /> : <FaPaperPlane size={13} />}
+                    <button
+                      onMouseDown={(e) => { e.preventDefault(); handleSend(); }}
+                      disabled={sending}
+                      className="w-12 h-12 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/30 transition-all flex-shrink-0">
+                      {sending ? <FaSpinner className="animate-spin" size={16} /> : <FaPaperPlane size={16} />}
                     </button>
                   ) : (
-                    <button onClick={startRecording} disabled={uploadingMedia}
-                      className="w-10 h-10 rounded-full flex items-center justify-center bg-dark-cardSoft text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-all flex-shrink-0"
+                    <button
+                      onMouseDown={(e) => { e.preventDefault(); startRecording(); }}
+                      disabled={uploadingMedia}
+                      className="w-12 h-12 rounded-full flex items-center justify-center bg-dark-cardSoft text-gray-400 hover:text-green-400 hover:bg-green-500/10 transition-all flex-shrink-0"
                       title="Gravar audio">
-                      {uploadingMedia ? <FaSpinner className="animate-spin" size={13} /> : <FaMicrophone size={16} />}
+                      {uploadingMedia ? <FaSpinner className="animate-spin" size={16} /> : <FaMicrophone size={18} />}
                     </button>
                   )}
                 </>
