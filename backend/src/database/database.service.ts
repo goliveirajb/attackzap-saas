@@ -154,6 +154,19 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE automations MODIFY COLUMN type ENUM('scheduled_message','group_fetch','auto_reply','webhook_forward') DEFAULT 'scheduled_message'
 		`).catch(() => {});
 
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS push_subscriptions (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL,
+				endpoint VARCHAR(500) NOT NULL,
+				subscription_json TEXT NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE KEY uq_user_endpoint (user_id, endpoint)
+			)
+		`);
+
 		// Add role column to users
 		await pool.query(`
 			ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user' AFTER plan

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { DatabaseService } from "~/database/database.service";
 import { WhatsappService } from "~/whatsapp/whatsapp.service";
 import { CrmEventsService } from "./crm-events.service";
+import { PushService } from "~/push/push.service";
 
 @Injectable()
 export class CrmService implements OnModuleInit {
@@ -11,6 +12,7 @@ export class CrmService implements OnModuleInit {
 		private readonly db: DatabaseService,
 		private readonly whatsapp: WhatsappService,
 		private readonly events: CrmEventsService,
+		private readonly push: PushService,
 	) {}
 
 	async onModuleInit() {
@@ -340,7 +342,7 @@ export class CrmService implements OnModuleInit {
 
 		this.logger.log(`Message saved: ${phone} (${fromMe ? "out" : "in"}) via ${instanceName}`);
 
-		// Emit real-time event
+		// Emit real-time event (SSE)
 		this.events.emit({
 			userId,
 			type: "new_message",
@@ -354,6 +356,19 @@ export class CrmService implements OnModuleInit {
 				instanceName,
 			},
 		});
+
+		// Send Web Push notification for incoming messages
+		if (!fromMe) {
+			const title = pushName || phone;
+			const body = messageType !== "text"
+				? `[${messageType}] ${messageText || ""}`
+				: messageText || "Nova mensagem";
+			this.push.sendToUser(userId, {
+				title,
+				body: body.slice(0, 100),
+				data: { contactId: contact.id, url: "/conversations" },
+			}).catch((err) => this.logger.error(`Push error: ${err.message}`));
+		}
 
 		return { ok: true, contactId: contact.id, phone };
 	}

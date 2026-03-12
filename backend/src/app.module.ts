@@ -8,6 +8,7 @@ import { AutomationsModule } from "./automations/automations.module";
 import { N8nModule } from "./n8n/n8n.module";
 import { CrmModule } from "./crm/crm.module";
 import { AdminModule } from "./admin/admin.module";
+import { PushModule } from "./push/push.module";
 
 @Module({
 	imports: [
@@ -20,6 +21,7 @@ import { AdminModule } from "./admin/admin.module";
 		N8nModule,
 		CrmModule,
 		AdminModule,
+		PushModule,
 	],
 })
 export class AppModule {}

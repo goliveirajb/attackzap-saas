@@ -6,12 +6,11 @@ export function useNotifications(token) {
   const reconnectRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
-  // Request browser notification permission
+  // Request notification permission + subscribe to Web Push
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+    if (!token) return;
+    subscribeToPush(token);
+  }, [token]);
 
   // Connect to SSE
   useEffect(() => {
@@ -31,10 +30,9 @@ export function useNotifications(token) {
           const data = JSON.parse(event.data);
           listenersRef.current.forEach((fn) => fn(data));
 
-          // Browser notification + sound for incoming messages
+          // Sound for incoming messages (when tab is open)
           if (data.type === "new_message" && data.direction === "incoming") {
             playNotificationSound();
-            showBrowserNotification(data);
           }
         } catch {}
       };
@@ -43,7 +41,6 @@ export function useNotifications(token) {
         setConnected(false);
         es.close();
         eventSourceRef.current = null;
-        // Reconnect after 3s
         reconnectRef.current = setTimeout(connect, 3000);
       };
 
@@ -68,6 +65,62 @@ export function useNotifications(token) {
   return { subscribe, connected };
 }
 
+// ==================== WEB PUSH SUBSCRIPTION ====================
+
+async function subscribeToPush(token) {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+    // Request notification permission
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.ready;
+
+    // Get VAPID public key from server
+    const res = await fetch("/api/push/vapid-key");
+    const { publicKey } = await res.json();
+    if (!publicKey) return;
+
+    // Check existing subscription
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      // Convert VAPID key to Uint8Array
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+    }
+
+    // Send subscription to backend
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ subscription }),
+    });
+  } catch (err) {
+    console.warn("Push subscription failed:", err);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// ==================== NOTIFICATION SOUND ====================
+
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -82,27 +135,4 @@ function playNotificationSound() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.3);
   } catch {}
-}
-
-function showBrowserNotification(data) {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  if (document.hasFocus()) return; // Don't notify if tab is focused
-
-  const title = data.contactName || data.phone || "Nova mensagem";
-  const body = data.messageType !== "text"
-    ? `[${data.messageType}] ${data.messageText || ""}`
-    : data.messageText || "Nova mensagem";
-
-  const notification = new Notification(title, {
-    body: body.slice(0, 100),
-    icon: "/favicon.ico",
-    tag: `msg-${data.contactId}`,
-  });
-
-  notification.onclick = () => {
-    window.focus();
-    notification.close();
-  };
-
-  setTimeout(() => notification.close(), 5000);
 }

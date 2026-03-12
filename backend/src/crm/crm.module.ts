@@ -3,9 +3,10 @@ import { CrmService } from "./crm.service";
 import { CrmController } from "./crm.controller";
 import { CrmEventsService } from "./crm-events.service";
 import { WhatsappModule } from "~/whatsapp/whatsapp.module";
+import { PushModule } from "~/push/push.module";
 
 @Module({
-	imports: [WhatsappModule],
+	imports: [WhatsappModule, PushModule],
 	providers: [CrmService, CrmEventsService],
 	controllers: [CrmController],
 	exports: [CrmService, CrmEventsService],

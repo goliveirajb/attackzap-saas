@@ -1,4 +1,4 @@
-const CACHE_NAME = "attackzap-v1";
+const CACHE_NAME = "attackzap-v2";
 const PRECACHE = ["/", "/index.html"];
 
 self.addEventListener("install", (e) => {
@@ -29,5 +29,58 @@ self.addEventListener("fetch", (e) => {
         return res;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+// ==================== WEB PUSH ====================
+
+self.addEventListener("push", (e) => {
+  if (!e.data) return;
+
+  let payload;
+  try {
+    payload = e.data.json();
+  } catch {
+    payload = { title: "AttackZap", body: e.data.text() };
+  }
+
+  const options = {
+    body: payload.body || "Nova mensagem",
+    icon: "/icon-192.svg",
+    badge: "/icon-192.svg",
+    vibrate: [200, 100, 200],
+    tag: payload.data?.contactId ? `contact-${payload.data.contactId}` : "default",
+    renotify: true,
+    data: payload.data || {},
+    actions: [
+      { action: "open", title: "Abrir" },
+      { action: "close", title: "Fechar" },
+    ],
+  };
+
+  e.waitUntil(
+    self.registration.showNotification(payload.title || "AttackZap", options)
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+
+  if (e.action === "close") return;
+
+  const url = e.notification.data?.url || "/conversations";
+
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Focus existing tab if open
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      // Open new tab
+      return clients.openWindow(url);
+    })
   );
 });
