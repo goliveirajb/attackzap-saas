@@ -210,6 +210,11 @@ export class DatabaseService implements OnModuleInit {
 			WHERE c1.instance_id != c2.instance_id
 		`).catch(() => {});
 
+		// Add pinned column to contacts
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN pinned TINYINT(1) DEFAULT 0 AFTER last_read_at
+		`).catch(() => {});
+
 		// Quick replies table
 		await pool.query(`
 			CREATE TABLE IF NOT EXISTS quick_replies (

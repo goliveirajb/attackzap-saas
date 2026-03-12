@@ -6,7 +6,7 @@ import {
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
   FaSmile, FaPaperclip, FaTrash,
-  FaBolt, FaPlus, FaUsers,
+  FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack,
 } from "react-icons/fa";
 
 const EMOJI_LIST = [
@@ -20,7 +20,7 @@ const EMOJI_LIST = [
 
 const formatTime = (d) => {
   if (!d) return "";
-  return new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 };
 
 const formatChatDate = (d) => {
@@ -31,8 +31,8 @@ const formatChatDate = (d) => {
   const oneDay = 86400000;
   if (diff < oneDay && dt.getDate() === now.getDate()) return formatTime(d);
   if (diff < oneDay * 2) return "Ontem";
-  if (diff < oneDay * 7) return dt.toLocaleDateString("pt-BR", { weekday: "short" });
-  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (diff < oneDay * 7) return dt.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "America/Sao_Paulo" });
+  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 };
 
 // Cache profile pics in memory to avoid re-fetching
@@ -122,6 +122,7 @@ export default function Conversations() {
   const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
   const [instanceFilter, setInstanceFilter] = useState(null); // null = all, instance_id
   const [activeChat, setActiveChat] = useState(null);
+  const [dropdownId, setDropdownId] = useState(null);
 
   const load = async () => {
     try {
@@ -240,6 +241,15 @@ export default function Conversations() {
         (c) => (c.name && c.name.toLowerCase().includes(q)) || c.phone.includes(q)
       );
     }
+    // Sort pinned first, then by last_message_at
+    list.sort((a, b) => {
+      const pa = a.pinned ? 1 : 0;
+      const pb = b.pinned ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+      const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+      return tb - ta;
+    });
     return list;
   }, [contacts, search, stageFilter, instanceFilter]);
 
@@ -250,6 +260,28 @@ export default function Conversations() {
     }
   };
   const closeChat = () => { setActiveChat(null); load(); };
+
+  const togglePin = async (contactId, currentPinned) => {
+    const pinned = !currentPinned;
+    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, pinned } : c));
+    setDropdownId(null);
+    try {
+      await authFetch(`/api/crm/contacts/${contactId}/pin`, {
+        method: "PUT",
+        body: JSON.stringify({ pinned }),
+      });
+    } catch {
+      setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, pinned: currentPinned } : c));
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!dropdownId) return;
+    const close = () => setDropdownId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [dropdownId]);
 
   // Hide/show bottom nav + mobile header when chat is open (mobile)
   useEffect(() => {
@@ -403,7 +435,7 @@ export default function Conversations() {
                 <div
                   key={c.id}
                   onClick={() => openChat(c)}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all border-b border-dark-border/30 ${
+                  className={`group flex items-center gap-3 px-4 py-3 cursor-pointer transition-all border-b border-dark-border/30 relative ${
                     isActive
                       ? "bg-primary/10 border-l-2 border-l-primary"
                       : "hover:bg-dark-cardSoft/50"
@@ -425,26 +457,51 @@ export default function Conversations() {
                       <p className={`text-sm truncate ${unread > 0 ? "font-bold text-white" : "font-semibold text-white"}`}>
                         {c.name || c.phone}
                       </p>
-                      <span className={`text-[10px] flex-shrink-0 ml-2 ${
-                        unread > 0 ? "text-green-400 font-semibold" : c.last_message_at ? "text-primary" : "text-gray-600"
-                      }`}>
-                        {formatChatDate(c.last_message_at)}
-                      </span>
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                        <span className={`text-[10px] ${
+                          unread > 0 ? "text-green-400 font-semibold" : c.last_message_at ? "text-primary" : "text-gray-600"
+                        }`}>
+                          {formatChatDate(c.last_message_at)}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <p className={`text-xs truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
                         {c.name ? c.phone : "Toque para abrir"}
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {c.pinned && <FaThumbtack size={10} className="text-gray-500" />}
                         {c.stage_name && (
                           <span className="text-[8px] px-1.5 py-0.5 rounded-full font-medium"
                             style={{ backgroundColor: (c.stage_color || "#666") + "20", color: c.stage_color }}>
                             {c.stage_name}
                           </span>
                         )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDropdownId(dropdownId === c.id ? null : c.id); }}
+                          className="w-5 h-5 flex items-center justify-center rounded-full text-gray-500 hover:text-white hover:bg-dark-cardSoft opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <FaChevronDown size={8} />
+                        </button>
                       </div>
                     </div>
                   </div>
+
+                  {/* Dropdown menu */}
+                  {dropdownId === c.id && (
+                    <div
+                      className="absolute right-3 top-12 z-50 bg-dark-card border border-dark-border rounded-lg shadow-xl py-1 min-w-[160px]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => togglePin(c.id, c.pinned)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-dark-cardSoft transition"
+                      >
+                        <FaThumbtack size={12} className={c.pinned ? "text-primary" : ""} />
+                        {c.pinned ? "Desafixar conversa" : "Fixar conversa"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -853,7 +910,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     const groups = [];
     let currentDate = "";
     messages.forEach((msg) => {
-      const date = new Date(msg.created_at).toLocaleDateString("pt-BR");
+      const date = new Date(msg.created_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
       if (date !== currentDate) { currentDate = date; groups.push({ type: "date", date }); }
       groups.push({ type: "msg", ...msg });
     });

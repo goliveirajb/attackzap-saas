@@ -107,7 +107,7 @@ export class CrmService implements OnModuleInit {
 			 LEFT JOIN crm_stages cs ON c.stage_id = cs.id
 			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
 			 WHERE c.user_id = ?
-			 ORDER BY c.last_message_at DESC, c.updated_at DESC`,
+			 ORDER BY c.pinned DESC, c.last_message_at DESC, c.updated_at DESC`,
 			[userId],
 		);
 		return rows;
@@ -215,6 +215,17 @@ export class CrmService implements OnModuleInit {
 			[contactId, userId],
 		);
 		return { ok: true };
+	}
+
+	// ==================== PIN ====================
+
+	async togglePin(userId: number, contactId: number, pinned: boolean) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE contacts SET pinned = ? WHERE id = ? AND user_id = ?`,
+			[pinned ? 1 : 0, contactId, userId],
+		);
+		return { ok: true, pinned };
 	}
 
 	// ==================== MESSAGES ====================

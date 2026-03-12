@@ -117,6 +117,14 @@ export class CrmController {
 		return this.svc.markAsRead(req.user.id, Number(id));
 	}
 
+	// ==================== PIN ====================
+
+	@Put("contacts/:id/pin")
+	@UseGuards(JwtAuthGuard)
+	async togglePin(@Req() req, @Param("id") id: string, @Body() body: { pinned: boolean }) {
+		return this.svc.togglePin(req.user.id, Number(id), body.pinned);
+	}
+
 	// ==================== MESSAGES ====================
 
 	@Get("contacts/:id/messages")

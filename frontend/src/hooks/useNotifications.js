@@ -139,24 +139,54 @@ function urlBase64ToUint8Array(base64String) {
 
 // ==================== NOTIFICATION SOUND ====================
 
+// Generate a short WAV notification sound programmatically (two-tone beep)
+function generateNotificationWav() {
+  const sampleRate = 22050;
+  const duration = 0.25;
+  const samples = Math.floor(sampleRate * duration);
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+
+  // WAV header
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, samples * 2, true);
+
+  // Two-tone: 660Hz then 880Hz with fade out
+  for (let i = 0; i < samples; i++) {
+    const t = i / sampleRate;
+    const freq = t < 0.1 ? 660 : 880;
+    const envelope = Math.max(0, 1 - (t / duration));
+    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.4;
+    view.setInt16(44 + i * 2, sample * 32767, true);
+  }
+
+  const blob = new Blob([buffer], { type: "audio/wav" });
+  return URL.createObjectURL(blob);
+}
+
+// Pre-generate the sound URL once (works in background tabs unlike AudioContext oscillators)
+let _notifSoundUrl = null;
+function getNotifSoundUrl() {
+  if (!_notifSoundUrl) _notifSoundUrl = generateNotificationWav();
+  return _notifSoundUrl;
+}
+
 function playNotificationSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const t = ctx.currentTime;
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
-    osc1.frequency.setValueAtTime(660, t);
-    osc2.frequency.setValueAtTime(880, t + 0.08);
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.setValueAtTime(0.25, t + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    osc1.start(t);
-    osc1.stop(t + 0.08);
-    osc2.start(t + 0.08);
-    osc2.stop(t + 0.2);
+    const audio = new Audio(getNotifSoundUrl());
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
   } catch {}
 }
