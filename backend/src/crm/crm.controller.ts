@@ -155,6 +155,12 @@ export class CrmController {
 
 	// ==================== WEBHOOK (public - called by Evolution) ====================
 
+	// Test endpoint - access GET /api/crm/webhook to verify route is reachable
+	@Get("webhook")
+	webhookTest() {
+		return { ok: true, message: "CRM webhook endpoint is reachable", timestamp: new Date().toISOString() };
+	}
+
 	@Post("webhook")
 	async webhook(@Body() body: any) {
 		console.log("[CRM WEBHOOK] Received:", JSON.stringify({
