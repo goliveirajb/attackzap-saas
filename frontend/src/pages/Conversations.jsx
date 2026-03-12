@@ -122,6 +122,7 @@ export default function Conversations() {
   const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
   const [instanceFilter, setInstanceFilter] = useState(null); // null = all, instance_id
   const [activeChat, setActiveChat] = useState(null);
+  const activeChatRef = useRef(null);
   const [dropdownId, setDropdownId] = useState(null);
 
   const load = async () => {
@@ -163,26 +164,27 @@ export default function Conversations() {
     if (!subscribeEvents) return;
     return subscribeEvents((event) => {
       if (event.type === "new_message") {
+        const isActiveChat = activeChatRef.current?.id === event.contactId;
+
         setContacts((prev) => {
           const idx = prev.findIndex((c) => c.id === event.contactId);
           if (idx >= 0) {
-            // Update existing contact: move to top, update last message preview
             const updated = [...prev];
             const contact = { ...updated[idx], last_message_at: event.createdAt };
-            if (event.direction === "incoming") {
-              contact.unread_count = (contact.unread_count || 0) + 1;
+            // Only increment unread if chat is NOT currently open
+            if (event.direction === "incoming" && !isActiveChat) {
+              contact.unread_count = (Number(contact.unread_count) || 0) + 1;
             }
             updated.splice(idx, 1);
             updated.unshift(contact);
             return updated;
           }
-          // New contact from webhook - do a full reload to get all fields
           load();
           return prev;
         });
 
-        // Show in-app toast notification for incoming messages from other contacts
-        if (event.direction === "incoming" && event.contactId !== activeChat) {
+        // Show in-app toast for incoming messages from other contacts
+        if (event.direction === "incoming" && !isActiveChat) {
           toast(
             `${event.contactName || event.phone}: ${event.messageText?.slice(0, 60) || `[${event.messageType}]`}`,
             { icon: "💬", duration: 4000, style: { background: "#202c33", color: "#e9edef", fontSize: "13px" } }
@@ -190,7 +192,7 @@ export default function Conversations() {
         }
       }
     });
-  }, [subscribeEvents, activeChat]);
+  }, [subscribeEvents]);
 
   // Fallback poll every 30s (SSE handles real-time)
   useEffect(() => {
@@ -255,11 +257,12 @@ export default function Conversations() {
 
   const openChat = (c) => {
     setActiveChat(c);
+    activeChatRef.current = c;
     if (Number(c.unread_count) > 0) {
       setContacts((prev) => prev.map((ct) => ct.id === c.id ? { ...ct, unread_count: 0 } : ct));
     }
   };
-  const closeChat = () => { setActiveChat(null); load(); };
+  const closeChat = () => { setActiveChat(null); activeChatRef.current = null; load(); };
 
   const togglePin = async (contactId, currentPinned) => {
     const pinned = !currentPinned;

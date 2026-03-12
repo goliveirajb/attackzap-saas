@@ -139,10 +139,10 @@ function urlBase64ToUint8Array(base64String) {
 
 // ==================== NOTIFICATION SOUND ====================
 
-// Generate a short WAV notification sound programmatically (two-tone beep)
+// Generate a WAV notification sound (WhatsApp-style two-tone chime)
 function generateNotificationWav() {
-  const sampleRate = 22050;
-  const duration = 0.25;
+  const sampleRate = 44100;
+  const duration = 0.6;
   const samples = Math.floor(sampleRate * duration);
   const buffer = new ArrayBuffer(44 + samples * 2);
   const view = new DataView(buffer);
@@ -163,13 +163,33 @@ function generateNotificationWav() {
   writeStr(36, "data");
   view.setUint32(40, samples * 2, true);
 
-  // Two-tone: 660Hz then 880Hz with fade out
+  // Two-tone chime: first note then higher note with smooth envelope
   for (let i = 0; i < samples; i++) {
     const t = i / sampleRate;
-    const freq = t < 0.1 ? 660 : 880;
-    const envelope = Math.max(0, 1 - (t / duration));
-    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.4;
-    view.setInt16(44 + i * 2, sample * 32767, true);
+    let sample = 0;
+
+    // First tone: 0-0.15s at 523Hz (C5)
+    if (t < 0.2) {
+      const env = t < 0.01 ? t / 0.01 : Math.exp(-(t - 0.01) * 6);
+      sample += Math.sin(2 * Math.PI * 523 * t) * env * 0.5;
+    }
+
+    // Second tone: 0.15-0.5s at 659Hz (E5)
+    if (t > 0.15 && t < 0.55) {
+      const t2 = t - 0.15;
+      const env = t2 < 0.01 ? t2 / 0.01 : Math.exp(-(t2 - 0.01) * 4);
+      sample += Math.sin(2 * Math.PI * 659 * t) * env * 0.5;
+    }
+
+    // Soft harmonic for richness
+    if (t < 0.2) {
+      sample += Math.sin(2 * Math.PI * 1046 * t) * Math.exp(-t * 12) * 0.15;
+    }
+    if (t > 0.15 && t < 0.55) {
+      sample += Math.sin(2 * Math.PI * 1318 * (t - 0.15)) * Math.exp(-(t - 0.15) * 10) * 0.15;
+    }
+
+    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 32767, true);
   }
 
   const blob = new Blob([buffer], { type: "audio/wav" });
@@ -186,7 +206,8 @@ function getNotifSoundUrl() {
 function playNotificationSound() {
   try {
     const audio = new Audio(getNotifSoundUrl());
-    audio.volume = 0.5;
-    audio.play().catch(() => {});
+    audio.volume = 1.0;
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => {});
   } catch {}
 }
