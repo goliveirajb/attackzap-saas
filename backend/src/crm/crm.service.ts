@@ -392,7 +392,7 @@ export class CrmService implements OnModuleInit {
 		if (!data) return { ignored: true };
 
 		const instanceName = payload?.instance;
-		this.logger.log(`Webhook received: event=${event}, instance=${instanceName}`);
+		this.logger.log(`Webhook received: event=${event}, instance=${instanceName}, remoteJid=${data?.key?.remoteJid}, fromMe=${data?.key?.fromMe}`);
 		const remoteJid = data?.key?.remoteJid;
 		const fromMe = data?.key?.fromMe;
 		const pushName = data?.pushName || payload?.data?.pushName || null;
@@ -431,7 +431,13 @@ export class CrmService implements OnModuleInit {
 		);
 		const instance = (instances as any[])[0];
 		if (!instance) {
-			this.logger.warn(`Webhook: instance not found for name="${instanceName}"`);
+			// Log all instances in DB to help debug
+			const [allInstances] = await pool.query(
+				`SELECT id, instance_name, instance_key, display_name FROM whatsapp_instances`,
+			);
+			this.logger.warn(
+				`Webhook: instance not found for name="${instanceName}". DB instances: ${JSON.stringify(allInstances)}`,
+			);
 			return { ignored: true, reason: "instance not found" };
 		}
 

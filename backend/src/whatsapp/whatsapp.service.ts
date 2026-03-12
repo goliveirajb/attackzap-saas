@@ -344,6 +344,32 @@ export class WhatsappService {
 		}
 	}
 
+	// Debug: mostrar todas instancias no banco (para diagnosticar webhook)
+	async debugInstances() {
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(
+			`SELECT id, user_id, instance_name, instance_key, display_name, status, webhook_url FROM whatsapp_instances`,
+		);
+
+		// Also fetch Evolution API instances list
+		let evolutionInstances = null;
+		try {
+			const res = await fetch(`${this.evolutionUrl}/instance/fetchInstances`, {
+				method: "GET",
+				headers: { apikey: this.evolutionKey },
+			});
+			if (res.ok) {
+				evolutionInstances = await res.json();
+			}
+		} catch {}
+
+		return {
+			db_instances: rows,
+			evolution_instances: evolutionInstances,
+			api_base_url: process.env.API_BASE_URL || process.env.WEBHOOK_BASE_URL || "(not set)",
+		};
+	}
+
 	// Listar instancias do usuario
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();
@@ -354,6 +380,17 @@ export class WhatsappService {
 			[userId],
 		);
 		return rows;
+	}
+
+	// Corrigir instance_name no banco (caso tenha sido corrompido pelo rename antigo)
+	async fixInstanceName(instanceId: number, correctName: string) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE whatsapp_instances SET instance_name = ? WHERE id = ?`,
+			[correctName, instanceId],
+		);
+		this.logger.log(`Instance ${instanceId} instance_name fixed to: ${correctName}`);
+		return { ok: true, instance_name: correctName };
 	}
 
 	// Renomear instancia (apenas display name, instance_name fica como o nome real na Evolution)

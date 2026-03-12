@@ -17,6 +17,11 @@ export class WhatsappController {
 		return this.whatsappService.listByUser(req.user.id);
 	}
 
+	@Get("instances/debug/all")
+	async debugInstances() {
+		return this.whatsappService.debugInstances();
+	}
+
 	@Get("instances/:name/qrcode")
 	async qrcode(@Param("name") name: string) {
 		return this.whatsappService.getQrCode(name);
@@ -65,6 +70,11 @@ export class WhatsappController {
 	@Post("instances/:name/fix-webhook")
 	async fixWebhook(@Param("name") name: string) {
 		return this.whatsappService.autoConfigureCrmWebhook(name, true);
+	}
+
+	@Post("instances/:id/fix-name")
+	async fixInstanceName(@Param("id") id: string, @Body() body: { correctName: string }) {
+		return this.whatsappService.fixInstanceName(Number(id), body.correctName);
 	}
 
 	@Delete("instances/:id/:name")
