@@ -115,7 +115,7 @@ const msgTypeIcon = (type) => {
 };
 
 export default function Conversations() {
-  const { authFetch, subscribeEvents } = useAuth();
+  const { authFetch, subscribeEvents, resetUnread } = useAuth();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -141,7 +141,7 @@ export default function Conversations() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); resetUnread(); }, []);
 
   // Reload when tab/app becomes visible again (user returns from another page or app)
   useEffect(() => {

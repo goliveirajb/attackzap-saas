@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Subject, Observable } from "rxjs";
+import { Subject, Observable, merge, interval } from "rxjs";
 import { map, filter } from "rxjs/operators";
 
 export interface CrmEvent {
@@ -19,9 +19,16 @@ export class CrmEventsService {
 	}
 
 	subscribe(userId: number): Observable<MessageEvent> {
-		return this.events$.pipe(
+		// Merge real events with heartbeat every 15s to keep connection alive
+		const heartbeat$ = interval(15000).pipe(
+			map(() => ({ data: { type: "heartbeat" } }) as MessageEvent),
+		);
+
+		const events$ = this.events$.pipe(
 			filter((e) => e.userId === userId),
 			map((e) => ({ data: { type: e.type, ...e.data } }) as MessageEvent),
 		);
+
+		return merge(events$, heartbeat$);
 	}
 }

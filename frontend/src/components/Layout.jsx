@@ -74,7 +74,7 @@ const getBottomNavItems = () => {
 };
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, totalUnread } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -146,6 +146,11 @@ export default function Layout() {
                     >
                       <link.icon className="text-base" />
                       {link.label}
+                      {link.to === "/app/conversations" && totalUnread > 0 && (
+                        <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
+                          {totalUnread > 99 ? "99+" : totalUnread}
+                        </span>
+                      )}
                     </NavLink>
                   ))}
                 </div>
@@ -160,7 +165,7 @@ export default function Layout() {
                   end={link.to === "/app"}
                   title={link.label}
                   className={({ isActive }) =>
-                    `w-11 h-11 flex items-center justify-center rounded-xl transition-all ${
+                    `w-11 h-11 flex items-center justify-center rounded-xl transition-all relative ${
                       isActive
                         ? "bg-primary text-white shadow-md"
                         : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
@@ -168,6 +173,11 @@ export default function Layout() {
                   }
                 >
                   <link.icon size={18} />
+                  {link.to === "/app/conversations" && totalUnread > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-green-500 text-white text-[9px] font-bold rounded-full px-1">
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -275,7 +285,7 @@ export default function Layout() {
                 to={item.to}
                 end={item.to === "/app"}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all ${
+                  `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all relative ${
                     isActive
                       ? "text-primary"
                       : "text-gray-500"
@@ -283,6 +293,11 @@ export default function Layout() {
                 }
               >
                 <item.icon size={18} />
+                {item.to === "/app/conversations" && totalUnread > 0 && (
+                  <span className="absolute top-0.5 right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-green-500 text-white text-[8px] font-bold rounded-full px-0.5">
+                    {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
+                )}
                 <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
               </NavLink>
             ))}

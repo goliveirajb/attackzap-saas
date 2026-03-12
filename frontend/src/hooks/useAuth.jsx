@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 import { useNotifications } from "./useNotifications";
 
 const AuthContext = createContext(null);
@@ -12,7 +12,12 @@ export function AuthProvider({ children }) {
   });
 
   const [token, setToken] = useState(() => localStorage.getItem("token") || null);
-  const { subscribe: subscribeEvents, connected: sseConnected } = useNotifications(token);
+  const { subscribe: subscribeEvents, connected: sseConnected, totalUnread, resetUnread } = useNotifications(token);
+
+  // Update page title with unread count
+  useEffect(() => {
+    document.title = totalUnread > 0 ? `(${totalUnread}) AttackZap` : "AttackZap";
+  }, [totalUnread]);
 
   const login = useCallback(async (email, password) => {
     const res = await fetch(`${API}/auth/login`, {
@@ -66,8 +71,8 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ user, token, login, register, logout, authFetch, subscribeEvents, sseConnected }),
-    [user, token, login, register, logout, authFetch, subscribeEvents, sseConnected]
+    () => ({ user, token, login, register, logout, authFetch, subscribeEvents, sseConnected, totalUnread, resetUnread }),
+    [user, token, login, register, logout, authFetch, subscribeEvents, sseConnected, totalUnread, resetUnread]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

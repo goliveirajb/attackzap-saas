@@ -5,6 +5,7 @@ export function useNotifications(token) {
   const listenersRef = useRef(new Set());
   const reconnectRef = useRef(null);
   const [connected, setConnected] = useState(false);
+  const [totalUnread, setTotalUnread] = useState(0);
 
   // Request notification permission + subscribe to Web Push
   useEffect(() => {
@@ -21,28 +22,53 @@ export function useNotifications(token) {
         eventSourceRef.current.close();
       }
 
+      console.log("[SSE] Connecting...");
       const es = new EventSource(`/api/crm/events?token=${token}`);
 
-      es.onopen = () => setConnected(true);
+      es.onopen = () => {
+        console.log("[SSE] Connected");
+        setConnected(true);
+      };
 
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          // Skip heartbeat events
+          if (data.type === "heartbeat") return;
+
+          console.log("[SSE] Event:", data.type, data.contactId);
+
           // Dispatch to all listeners immediately
           listenersRef.current.forEach((fn) => fn(data));
 
-          // Sound for incoming messages (when tab is open)
+          // Sound + unread for incoming messages
           if (data.type === "new_message" && data.direction === "incoming") {
             playNotificationSound();
+            setTotalUnread((prev) => prev + 1);
+
+            // Browser notification if tab is not focused
+            if (document.hidden && Notification.permission === "granted") {
+              try {
+                new Notification(data.contactName || data.phone || "Nova mensagem", {
+                  body: data.messageText?.slice(0, 80) || `[${data.messageType}]`,
+                  icon: "/icon-192.png",
+                  tag: `msg-${data.contactId}`,
+                  renotify: true,
+                });
+              } catch {}
+            }
           }
-        } catch {}
+        } catch (err) {
+          console.warn("[SSE] Parse error:", err);
+        }
       };
 
       es.onerror = () => {
+        console.log("[SSE] Disconnected, reconnecting in 1s...");
         setConnected(false);
         es.close();
         eventSourceRef.current = null;
-        // Reconnect fast (1s) to minimize notification gaps
         reconnectRef.current = setTimeout(connect, 1000);
       };
 
@@ -64,7 +90,9 @@ export function useNotifications(token) {
     return () => listenersRef.current.delete(fn);
   }, []);
 
-  return { subscribe, connected };
+  const resetUnread = useCallback(() => setTotalUnread(0), []);
+
+  return { subscribe, connected, totalUnread, resetUnread };
 }
 
 // ==================== WEB PUSH SUBSCRIPTION ====================
@@ -73,22 +101,18 @@ async function subscribeToPush(token) {
   try {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
-    // Request notification permission
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return;
 
     const registration = await navigator.serviceWorker.ready;
 
-    // Get VAPID public key from server
     const res = await fetch("/api/push/vapid-key");
     const { publicKey } = await res.json();
     if (!publicKey) return;
 
-    // Check existing subscription
     let subscription = await registration.pushManager.getSubscription();
 
     if (!subscription) {
-      // Convert VAPID key to Uint8Array
       const applicationServerKey = urlBase64ToUint8Array(publicKey);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -96,7 +120,6 @@ async function subscribeToPush(token) {
       });
     }
 
-    // Send subscription to backend
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: {
@@ -127,7 +150,6 @@ function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const t = ctx.currentTime;
-    // Two-tone pop like WhatsApp
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
