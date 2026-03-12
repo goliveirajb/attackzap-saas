@@ -187,6 +187,12 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN profile_pic_url VARCHAR(500) DEFAULT NULL AFTER is_group
 		`).catch(() => {});
 
+		// Add display_name to instances (instance_name stays as Evolution API name)
+		await pool.query(`
+			ALTER TABLE whatsapp_instances ADD COLUMN display_name VARCHAR(255) DEFAULT NULL AFTER instance_name
+		`).catch(() => {});
+
+
 		// Ensure unique key is (user_id, phone, instance_id) so groups from different instances are separate
 		// Drop old keys if they exist, then create the correct one
 		await pool.query(`ALTER TABLE contacts DROP INDEX uq_user_phone`).catch(() => {});

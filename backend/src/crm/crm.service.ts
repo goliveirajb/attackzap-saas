@@ -97,7 +97,7 @@ export class CrmService implements OnModuleInit {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
 			`SELECT c.*, cs.name as stage_name, cs.color as stage_color,
-			        wi.instance_name,
+			        COALESCE(wi.display_name, wi.instance_name) as instance_name,
 			        (SELECT COUNT(*) FROM contact_messages cm
 			         WHERE cm.contact_id = c.id
 			           AND cm.direction = 'incoming'
@@ -392,6 +392,7 @@ export class CrmService implements OnModuleInit {
 		if (!data) return { ignored: true };
 
 		const instanceName = payload?.instance;
+		this.logger.log(`Webhook received: event=${event}, instance=${instanceName}`);
 		const remoteJid = data?.key?.remoteJid;
 		const fromMe = data?.key?.fromMe;
 		const pushName = data?.pushName || payload?.data?.pushName || null;
@@ -421,13 +422,18 @@ export class CrmService implements OnModuleInit {
 		// Extract phone/group ID from jid
 		const phone = remoteJid.replace("@s.whatsapp.net", "").replace("@c.us", "").replace("@g.us", "");
 
-		// Find instance + user
+		// Find instance + user (search by instance_name, instance_key, or display_name)
 		const [instances] = await pool.query(
-			`SELECT id, user_id FROM whatsapp_instances WHERE instance_name = ? LIMIT 1`,
-			[instanceName],
+			`SELECT id, user_id FROM whatsapp_instances
+			 WHERE instance_name = ? OR instance_key = ? OR display_name = ?
+			 LIMIT 1`,
+			[instanceName, instanceName, instanceName],
 		);
 		const instance = (instances as any[])[0];
-		if (!instance) return { ignored: true, reason: "instance not found" };
+		if (!instance) {
+			this.logger.warn(`Webhook: instance not found for name="${instanceName}"`);
+			return { ignored: true, reason: "instance not found" };
+		}
 
 		const userId = instance.user_id;
 		const instanceId = instance.id;

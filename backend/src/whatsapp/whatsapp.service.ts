@@ -257,8 +257,10 @@ export class WhatsappService {
 	}
 
 	// Buscar foto de perfil via Evolution API
+	// number must be full JID: 5511999999999@s.whatsapp.net or groupid@g.us
 	async getProfilePicture(instanceName: string, number: string): Promise<string | null> {
 		try {
+			this.logger.log(`Fetching profile pic: instance=${instanceName}, number=${number}`);
 			const res = await fetch(
 				`${this.evolutionUrl}/chat/fetchProfilePictureUrl/${instanceName}`,
 				{
@@ -271,10 +273,16 @@ export class WhatsappService {
 				},
 			);
 
-			if (!res.ok) return null;
+			if (!res.ok) {
+				const errText = await res.text().catch(() => "");
+				this.logger.warn(`Profile pic fetch failed (${res.status}): ${errText}`);
+				return null;
+			}
 			const data = await res.json();
-			return data?.profilePictureUrl || data?.picture || data?.url || null;
-		} catch {
+			this.logger.log(`Profile pic response: ${JSON.stringify(data)}`);
+			return data?.profilePictureUrl || null;
+		} catch (err) {
+			this.logger.error(`Profile pic error: ${err.message}`);
 			return null;
 		}
 	}
@@ -285,8 +293,8 @@ export class WhatsappService {
 
 		// Check if webhook already set for this instance
 		const [rows] = await pool.query(
-			`SELECT webhook_url FROM whatsapp_instances WHERE instance_name = ? LIMIT 1`,
-			[instanceName],
+			`SELECT webhook_url FROM whatsapp_instances WHERE instance_name = ? OR instance_key = ? LIMIT 1`,
+			[instanceName, instanceName],
 		);
 		const instance = (rows as any[])[0];
 		const baseUrl = process.env.API_BASE_URL || process.env.WEBHOOK_BASE_URL || "";
@@ -304,8 +312,8 @@ export class WhatsappService {
 		try {
 			await this.setWebhook(instanceName, crmWebhookUrl);
 			await pool.query(
-				`UPDATE whatsapp_instances SET webhook_url = ? WHERE instance_name = ?`,
-				[crmWebhookUrl, instanceName],
+				`UPDATE whatsapp_instances SET webhook_url = ? WHERE instance_name = ? OR instance_key = ?`,
+				[crmWebhookUrl, instanceName, instanceName],
 			);
 			this.logger.log(`CRM webhook auto-configured for ${instanceName}: ${crmWebhookUrl}`);
 		} catch (err) {
@@ -317,21 +325,22 @@ export class WhatsappService {
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
-			`SELECT id, instance_name, instance_key, status, phone, webhook_url, created_at
+			`SELECT id, instance_name, display_name, COALESCE(display_name, instance_name) as instance_display,
+			        instance_key, status, phone, webhook_url, created_at
 			 FROM whatsapp_instances WHERE user_id = ? ORDER BY created_at DESC`,
 			[userId],
 		);
 		return rows;
 	}
 
-	// Renomear instancia (apenas display name no banco)
+	// Renomear instancia (apenas display name, instance_name fica como o nome real na Evolution)
 	async renameInstance(instanceId: number, newName: string) {
 		const pool = this.db.getPool();
 		await pool.query(
-			`UPDATE whatsapp_instances SET instance_name = ? WHERE id = ?`,
+			`UPDATE whatsapp_instances SET display_name = ? WHERE id = ?`,
 			[newName, instanceId],
 		);
-		this.logger.log(`Instance ${instanceId} renamed to: ${newName}`);
+		this.logger.log(`Instance ${instanceId} display_name set to: ${newName}`);
 		return { ok: true, name: newName };
 	}
 

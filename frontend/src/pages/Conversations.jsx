@@ -5,7 +5,7 @@ import {
   FaWhatsapp, FaSearch, FaSpinner, FaPaperPlane, FaCheck, FaCheckDouble,
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
-  FaSmile, FaPaperclip, FaStop, FaPlay, FaPause, FaTrash,
+  FaSmile, FaPaperclip, FaTrash,
   FaBolt, FaPlus, FaUsers,
 } from "react-icons/fa";
 
@@ -35,10 +35,76 @@ const formatChatDate = (d) => {
   return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 };
 
-const formatFullDate = (d) => {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("pt-BR") + " " + formatTime(d);
+// Cache profile pics in memory to avoid re-fetching
+const profilePicCache = {};
+
+const AVATAR_SIZES = {
+  10: { cls: "w-10 h-10", icon: 16 },
+  12: { cls: "w-12 h-12", icon: 18 },
+  16: { cls: "w-16 h-16", icon: 24 },
 };
+
+function ContactAvatar({ contact, size = 12, textSize = "text-sm", authFetch }) {
+  const [picUrl, setPicUrl] = useState(profilePicCache[contact.id] || contact.profile_pic_url || null);
+  const [failed, setFailed] = useState(false);
+  const initials = (contact.name || contact.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  const s = AVATAR_SIZES[size] || AVATAR_SIZES[12];
+
+  useEffect(() => {
+    // If we already have a cached result, use it
+    if (contact.id in profilePicCache) {
+      if (profilePicCache[contact.id]) setPicUrl(profilePicCache[contact.id]);
+      else setFailed(true);
+      return;
+    }
+    // If contact has a stored URL, try it
+    if (contact.profile_pic_url) {
+      profilePicCache[contact.id] = contact.profile_pic_url;
+      setPicUrl(contact.profile_pic_url);
+      return;
+    }
+    // Fetch from API
+    let cancelled = false;
+    authFetch(`/api/crm/contacts/${contact.id}/profile-pic`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.url) {
+          profilePicCache[contact.id] = data.url;
+          setPicUrl(data.url);
+        } else {
+          profilePicCache[contact.id] = false;
+          setFailed(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          profilePicCache[contact.id] = false;
+          setFailed(true);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [contact.id]);
+
+  if (picUrl && !failed) {
+    return (
+      <img
+        src={picUrl}
+        alt=""
+        className={`${s.cls} rounded-full object-cover`}
+        onError={() => { setFailed(true); profilePicCache[contact.id] = false; }}
+      />
+    );
+  }
+
+  return (
+    <div className={`${s.cls} rounded-full flex items-center justify-center text-white font-bold ${textSize} ${
+      contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary/80 to-primaryDark"
+    }`}>
+      {contact.is_group ? <FaUsers size={s.icon} /> : initials}
+    </div>
+  );
+}
 
 const msgTypeIcon = (type) => {
   if (type === "image") return <FaImage size={10} className="inline mr-1 text-gray-500" />;
@@ -56,7 +122,6 @@ export default function Conversations() {
   const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
   const [instanceFilter, setInstanceFilter] = useState(null); // null = all, instance_id
   const [activeChat, setActiveChat] = useState(null);
-  const [lastMessages, setLastMessages] = useState({});
 
   const load = async () => {
     try {
@@ -153,9 +218,6 @@ export default function Conversations() {
     }
     return list;
   }, [contacts, search, stageFilter, instanceFilter]);
-
-  const getInitials = (c) =>
-    (c.name || c.phone || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
   const openChat = (c) => {
     setActiveChat(c);
@@ -325,15 +387,7 @@ export default function Conversations() {
                 >
                   {/* Avatar */}
                   <div className="relative w-12 h-12 flex-shrink-0">
-                    {c.profile_pic_url ? (
-                      <img src={c.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover"
-                        onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-                    ) : null}
-                    <div className={`w-12 h-12 rounded-full items-center justify-center text-white font-bold text-sm ${
-                      c.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary/80 to-primaryDark"
-                    }`} style={{ display: c.profile_pic_url ? "none" : "flex", position: c.profile_pic_url ? "absolute" : "relative", top: 0, left: 0 }}>
-                      {c.is_group ? <FaUsers size={18} /> : getInitials(c)}
-                    </div>
+                    <ContactAvatar contact={c} size={12} textSize="text-sm" authFetch={authFetch} />
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
                         {unread > 99 ? "99+" : unread}
@@ -758,8 +812,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     return groups;
   }, [messages]);
 
-  const initials = (contact.name || contact.phone || "?")
-    .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+
 
   return (
     <>
@@ -769,15 +822,9 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
             <FaArrowLeft size={14} />
           </button>
-          {contact.profile_pic_url ? (
-            <img src={contact.profile_pic_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-          ) : (
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-              contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
-            }`}>
-              {contact.is_group ? <FaUsers size={16} /> : initials}
-            </div>
-          )}
+          <div className="flex-shrink-0">
+            <ContactAvatar contact={contact} size={10} textSize="text-sm" authFetch={authFetch} />
+          </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
               {contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
@@ -1031,15 +1078,9 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           <div className="w-full md:w-80 flex flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
             {/* Avatar + basic info */}
             <div className="flex flex-col items-center py-5 border-b border-dark-border">
-              {contact.profile_pic_url ? (
-                <img src={contact.profile_pic_url} alt="" className="w-16 h-16 rounded-full object-cover mb-2" />
-              ) : (
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl mb-2 ${
-                  contact.is_group ? "bg-gradient-to-br from-green-600 to-green-800" : "bg-gradient-to-br from-primary to-primaryDark"
-                }`}>
-                  {contact.is_group ? <FaUsers size={24} /> : initials}
-                </div>
-              )}
+              <div className="mb-2">
+                <ContactAvatar contact={contact} size={16} textSize="text-xl" authFetch={authFetch} />
+              </div>
               <p className="text-white font-semibold">{contact.name || "Sem nome"}</p>
               <p className="text-gray-500 text-xs font-mono mt-0.5">{contact.phone}</p>
               {contact.stage_name && !editing && (

@@ -110,7 +110,7 @@ export default function Instances() {
 
   const startEdit = (inst) => {
     setEditingId(inst.id);
-    setEditName(inst.instance_name);
+    setEditName(inst.display_name || inst.instance_name);
   };
 
   const cancelEdit = () => {
@@ -213,7 +213,7 @@ export default function Instances() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-white">{inst.instance_name}</p>
+                      <p className="text-sm font-bold text-white">{inst.instance_display || inst.instance_name}</p>
                       <button onClick={() => startEdit(inst)} className="text-gray-600 hover:text-primary transition" title="Editar nome">
                         <FaPen size={10} />
                       </button>
