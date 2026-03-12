@@ -546,27 +546,31 @@ export class CrmService implements OnModuleInit {
 
 		this.logger.log(`Message saved: ${phone} (${fromMe ? "out" : "in"}) via ${instanceName}`);
 
-		// Emit real-time event (SSE)
+		// Emit real-time event (SSE) - include all data needed for instant UI update
 		this.events.emit({
 			userId,
 			type: "new_message",
 			data: {
 				contactId: contact.id,
 				phone,
-				contactName: pushName || phone,
+				contactName: contactName || pushName || phone,
 				messageText,
 				messageType,
 				direction: fromMe ? "outgoing" : "incoming",
 				instanceName,
+				instanceId: instanceId,
+				isGroup: isGroup,
+				createdAt: new Date().toISOString(),
 			},
 		});
 
-		// Send Web Push notification for incoming messages
+		// Send Web Push notification for incoming messages (fire-and-forget, don't block response)
 		if (!fromMe) {
-			const title = pushName || phone;
+			const title = contactName || pushName || phone;
 			const body = messageType !== "text"
 				? `[${messageType}] ${messageText || ""}`
 				: messageText || "Nova mensagem";
+			// Don't await - send in background for speed
 			this.push.sendToUser(userId, {
 				title,
 				body: body.slice(0, 100),

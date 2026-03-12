@@ -57,19 +57,21 @@ export class PushService implements OnModuleInit {
 
 		const message = JSON.stringify(payload);
 
-		for (const sub of subs) {
-			try {
-				const subscription = JSON.parse(sub.subscription_json);
-				await webPush.sendNotification(subscription, message);
-			} catch (err: any) {
-				// Remove expired/invalid subscriptions
-				if (err.statusCode === 404 || err.statusCode === 410) {
-					await pool.query(`DELETE FROM push_subscriptions WHERE id = ?`, [sub.id]);
-					this.logger.log(`Removed expired subscription ${sub.id}`);
-				} else {
-					this.logger.error(`Push failed for sub ${sub.id}: ${err.message}`);
+		// Send all push notifications in parallel for speed
+		await Promise.allSettled(
+			subs.map(async (sub) => {
+				try {
+					const subscription = JSON.parse(sub.subscription_json);
+					await webPush.sendNotification(subscription, message, { timeout: 5000 });
+				} catch (err: any) {
+					if (err.statusCode === 404 || err.statusCode === 410) {
+						await pool.query(`DELETE FROM push_subscriptions WHERE id = ?`, [sub.id]);
+						this.logger.log(`Removed expired subscription ${sub.id}`);
+					} else {
+						this.logger.error(`Push failed for sub ${sub.id}: ${err.message}`);
+					}
 				}
-			}
-		}
+			}),
+		);
 	}
 }

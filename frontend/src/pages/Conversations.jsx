@@ -157,19 +157,43 @@ export default function Conversations() {
     };
   }, []);
 
-  // Real-time updates via SSE - refresh contacts when new message arrives
+  // Real-time updates via SSE - instant contact list update without refetch
   useEffect(() => {
     if (!subscribeEvents) return;
     return subscribeEvents((event) => {
       if (event.type === "new_message") {
-        load();
+        setContacts((prev) => {
+          const idx = prev.findIndex((c) => c.id === event.contactId);
+          if (idx >= 0) {
+            // Update existing contact: move to top, update last message preview
+            const updated = [...prev];
+            const contact = { ...updated[idx], last_message_at: event.createdAt };
+            if (event.direction === "incoming") {
+              contact.unread_count = (contact.unread_count || 0) + 1;
+            }
+            updated.splice(idx, 1);
+            updated.unshift(contact);
+            return updated;
+          }
+          // New contact from webhook - do a full reload to get all fields
+          load();
+          return prev;
+        });
+
+        // Show in-app toast notification for incoming messages from other contacts
+        if (event.direction === "incoming" && event.contactId !== activeChat) {
+          toast(
+            `${event.contactName || event.phone}: ${event.messageText?.slice(0, 60) || `[${event.messageType}]`}`,
+            { icon: "💬", duration: 4000, style: { background: "#202c33", color: "#e9edef", fontSize: "13px" } }
+          );
+        }
       }
     });
-  }, [subscribeEvents]);
+  }, [subscribeEvents, activeChat]);
 
-  // Fallback poll every 15s
+  // Fallback poll every 30s (SSE handles real-time)
   useEffect(() => {
-    const iv = setInterval(load, 15000);
+    const iv = setInterval(load, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -519,8 +543,10 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     setLoading(true);
     setMessages([]);
     loadMessages();
-    // Fallback poll every 15s
-    pollRef.current = setInterval(loadMessages, 15000);
+    // Mark as read
+    authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
+    // Fallback poll every 30s (SSE handles real-time)
+    pollRef.current = setInterval(loadMessages, 30000);
     return () => clearInterval(pollRef.current);
   }, [loadMessages]);
 
@@ -540,17 +566,36 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     };
   }, [loadMessages, contact.id]);
 
-  // Real-time: reload messages when SSE event for this contact arrives
+  // Real-time: instantly insert new messages from SSE without refetch
   useEffect(() => {
     if (!subscribeEvents) return;
     return subscribeEvents((event) => {
       if (event.type === "new_message" && event.contactId === contact.id) {
-        loadMessages();
-        // Mark as read since we're viewing this chat
+        // Insert message directly into state for instant display
+        const newMsg = {
+          id: Date.now() + Math.random(),
+          contact_id: contact.id,
+          direction: event.direction,
+          message_text: event.messageText,
+          message_type: event.messageType,
+          created_at: event.createdAt || new Date().toISOString(),
+          has_media: 0,
+        };
+        setMessages((prev) => {
+          // Avoid duplicate if message was already added (e.g. own sent message)
+          const isDuplicate = prev.some((m) =>
+            m.message_text === newMsg.message_text &&
+            m.direction === newMsg.direction &&
+            Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 3000
+          );
+          if (isDuplicate) return prev;
+          return [...prev, newMsg];
+        });
+        // Mark as read since we're viewing
         authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
       }
     });
-  }, [subscribeEvents, contact.id, loadMessages]);
+  }, [subscribeEvents, contact.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

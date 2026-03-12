@@ -28,6 +28,7 @@ export function useNotifications(token) {
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Dispatch to all listeners immediately
           listenersRef.current.forEach((fn) => fn(data));
 
           // Sound for incoming messages (when tab is open)
@@ -41,7 +42,8 @@ export function useNotifications(token) {
         setConnected(false);
         es.close();
         eventSourceRef.current = null;
-        reconnectRef.current = setTimeout(connect, 3000);
+        // Reconnect fast (1s) to minimize notification gaps
+        reconnectRef.current = setTimeout(connect, 1000);
       };
 
       eventSourceRef.current = es;
@@ -124,15 +126,22 @@ function urlBase64ToUint8Array(base64String) {
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
+    const t = ctx.currentTime;
+    // Two-tone pop like WhatsApp
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
+    osc1.connect(gain);
+    osc2.connect(gain);
     gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
+    osc1.frequency.setValueAtTime(660, t);
+    osc2.frequency.setValueAtTime(880, t + 0.08);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.setValueAtTime(0.25, t + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc1.start(t);
+    osc1.stop(t + 0.08);
+    osc2.start(t + 0.08);
+    osc2.stop(t + 0.2);
   } catch {}
 }
