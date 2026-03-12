@@ -187,12 +187,21 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN profile_pic_url VARCHAR(500) DEFAULT NULL AFTER is_group
 		`).catch(() => {});
 
-		// Change unique key to include instance_id so groups from different instances are separate
-		await pool.query(`
-			ALTER TABLE contacts DROP INDEX uq_user_phone
-		`).catch(() => {});
+		// Ensure unique key is (user_id, phone, instance_id) so groups from different instances are separate
+		// Drop old keys if they exist, then create the correct one
+		await pool.query(`ALTER TABLE contacts DROP INDEX uq_user_phone`).catch(() => {});
+		await pool.query(`ALTER TABLE contacts DROP INDEX uq_user_phone_instance`).catch(() => {});
 		await pool.query(`
 			ALTER TABLE contacts ADD UNIQUE KEY uq_user_phone_instance (user_id, phone, instance_id)
+		`).catch(() => {});
+
+		// Clean up duplicate contacts (non-group) that may have been created - keep the one with latest message
+		await pool.query(`
+			DELETE c1 FROM contacts c1
+			INNER JOIN contacts c2
+			ON c1.user_id = c2.user_id AND c1.phone = c2.phone AND c1.is_group = 0 AND c2.is_group = 0
+			AND c1.id > c2.id
+			WHERE c1.instance_id != c2.instance_id
 		`).catch(() => {});
 
 		// Quick replies table

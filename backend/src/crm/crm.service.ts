@@ -436,28 +436,57 @@ export class CrmService implements OnModuleInit {
 		const stages = await this.getStages(userId);
 		const firstStage = (stages as any[])[0];
 
-		// For groups, extract group name from payload
+		// For groups, extract group name from metadata (pushName is the sender's name, not the group name)
 		const contactName = isGroup
-			? (data?.pushName || payload?.data?.groupMetadata?.subject || phone)
+			? (payload?.data?.groupMetadata?.subject || data?.groupMetadata?.subject || phone)
 			: pushName;
 
-		// Upsert contact (unique key is now user_id + phone + instance_id)
-		await pool.query(
-			`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
-			 VALUES (?, ?, ?, ?, ?, ?, NOW())
-			 ON DUPLICATE KEY UPDATE
-			   name = COALESCE(name, VALUES(name)),
-			   is_group = VALUES(is_group),
-			   last_message_at = NOW(),
-			   updated_at = NOW()`,
-			[userId, instanceId, phone, isGroup ? 1 : 0, contactName, isGroup ? null : (firstStage?.id || null)],
-		);
+		if (isGroup) {
+			// Groups: unique per (user_id, phone, instance_id) - each instance has its own groups
+			await pool.query(
+				`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
+				 VALUES (?, ?, ?, 1, ?, NULL, NOW())
+				 ON DUPLICATE KEY UPDATE
+				   name = COALESCE(name, VALUES(name)),
+				   last_message_at = NOW(),
+				   updated_at = NOW()`,
+				[userId, instanceId, phone, contactName],
+			);
+		} else {
+			// Individual contacts: check if already exists for this user (any instance)
+			const [existing] = await pool.query(
+				`SELECT id, instance_id FROM contacts WHERE user_id = ? AND phone = ? AND is_group = 0 LIMIT 1`,
+				[userId, phone],
+			);
+			const existingContact = (existing as any[])[0];
+
+			if (existingContact) {
+				// Update existing contact - keep original instance_id unless null
+				await pool.query(
+					`UPDATE contacts SET
+					   instance_id = COALESCE(instance_id, ?),
+					   name = COALESCE(name, ?),
+					   last_message_at = NOW(),
+					   updated_at = NOW()
+					 WHERE id = ?`,
+					[instanceId, contactName, existingContact.id],
+				);
+			} else {
+				// Create new contact
+				await pool.query(
+					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
+					 VALUES (?, ?, ?, 0, ?, ?, NOW())`,
+					[userId, instanceId, phone, contactName, firstStage?.id || null],
+				);
+			}
+		}
 
 		// Get contact ID
-		const [contacts] = await pool.query(
-			`SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ?`,
-			[userId, phone, instanceId],
-		);
+		const contactQuery = isGroup
+			? `SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ? AND is_group = 1`
+			: `SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND is_group = 0 LIMIT 1`;
+		const contactParams = isGroup ? [userId, phone, instanceId] : [userId, phone];
+		const [contacts] = await pool.query(contactQuery, contactParams);
 		const contact = (contacts as any[])[0];
 		if (!contact) return { ignored: true };
 

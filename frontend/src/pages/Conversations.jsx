@@ -78,6 +78,20 @@ export default function Conversations() {
 
   useEffect(() => { load(); }, []);
 
+  // Reload when tab/app becomes visible again (user returns from another page or app)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    // Also reload on window focus (covers switching tabs/apps)
+    window.addEventListener("focus", load);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", load);
+    };
+  }, []);
+
   // Real-time updates via SSE - refresh contacts when new message arrives
   useEffect(() => {
     if (!subscribeEvents) return;
@@ -88,9 +102,9 @@ export default function Conversations() {
     });
   }, [subscribeEvents]);
 
-  // Fallback poll every 30s (longer interval since SSE handles real-time)
+  // Fallback poll every 15s
   useEffect(() => {
-    const iv = setInterval(load, 30000);
+    const iv = setInterval(load, 15000);
     return () => clearInterval(iv);
   }, []);
 
@@ -451,10 +465,26 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     setLoading(true);
     setMessages([]);
     loadMessages();
-    // Fallback poll every 30s
-    pollRef.current = setInterval(loadMessages, 30000);
+    // Fallback poll every 15s
+    pollRef.current = setInterval(loadMessages, 15000);
     return () => clearInterval(pollRef.current);
   }, [loadMessages]);
+
+  // Reload messages when tab/app becomes visible again
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadMessages();
+        authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", loadMessages);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", loadMessages);
+    };
+  }, [loadMessages, contact.id]);
 
   // Real-time: reload messages when SSE event for this contact arrives
   useEffect(() => {
