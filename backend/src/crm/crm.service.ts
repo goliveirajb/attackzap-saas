@@ -328,15 +328,22 @@ export class CrmService implements OnModuleInit {
 		if (!contact) throw new Error("Contato nao encontrado");
 		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
 
+		this.logger.log(`Sending ${mediaType} to ${contact.phone} via ${contact.instance_name} (base64 size: ${Math.round(base64.length / 1024)}KB)`);
+
 		// Send via Evolution
 		await this.whatsapp.sendMedia(contact.instance_name, contact.phone, base64, caption, mediaType);
 
 		// Save to DB (store base64 in raw_data so we can display it later)
-		await pool.query(
-			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
-			 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
-			[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name, JSON.stringify({ media_base64: base64 })],
-		);
+		try {
+			await pool.query(
+				`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
+				 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
+				[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name, JSON.stringify({ media_base64: base64 })],
+			);
+		} catch (dbErr) {
+			// If DB save fails (e.g., packet too large), still consider success since Evolution sent it
+			this.logger.error(`DB save failed for media: ${dbErr.message}`);
+		}
 
 		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
 

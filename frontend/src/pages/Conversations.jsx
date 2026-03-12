@@ -677,14 +677,17 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
         body: JSON.stringify({ base64, caption: text.trim() || "", mediaType }),
       });
       toast.dismiss(toastId);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Erro ${res.status}`);
+      }
 
       setText("");
       toast.success(`${isVideo ? "Video" : "Imagem"} enviado!`);
       loadMessages();
-    } catch {
+    } catch (err) {
       toast.dismiss(toastId);
-      toast.error("Erro ao enviar arquivo");
+      toast.error(err.message || "Erro ao enviar arquivo");
     } finally {
       setUploadingMedia(false);
     }

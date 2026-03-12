@@ -206,7 +206,11 @@ export class WhatsappService {
 			},
 		);
 
-		if (!res.ok) throw new Error("Falha ao enviar media");
+		if (!res.ok) {
+			const errText = await res.text().catch(() => "");
+			this.logger.error(`sendMedia error (${res.status}): ${errText}`);
+			throw new Error(`Falha ao enviar media: ${res.status}`);
+		}
 		return await res.json();
 	}
 
