@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo } from "react";
+import { useNotifications } from "./useNotifications";
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,7 @@ export function AuthProvider({ children }) {
   });
 
   const [token, setToken] = useState(() => localStorage.getItem("token") || null);
+  const { subscribe: subscribeEvents, connected: sseConnected } = useNotifications(token);
 
   const login = useCallback(async (email, password) => {
     const res = await fetch(`${API}/auth/login`, {
@@ -64,8 +66,8 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ user, token, login, register, logout, authFetch }),
-    [user, token, login, register, logout, authFetch]
+    () => ({ user, token, login, register, logout, authFetch, subscribeEvents, sseConnected }),
+    [user, token, login, register, logout, authFetch, subscribeEvents, sseConnected]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

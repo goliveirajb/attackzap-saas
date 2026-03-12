@@ -1,10 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req, UseGuards, Query } from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Body, Param, Req, UseGuards, Query, Sse } from "@nestjs/common";
 import { CrmService } from "./crm.service";
+import { CrmEventsService } from "./crm-events.service";
 import { JwtAuthGuard } from "~/auth/jwt-auth.guard";
 
 @Controller("crm")
 export class CrmController {
-	constructor(private readonly svc: CrmService) {}
+	constructor(
+		private readonly svc: CrmService,
+		private readonly events: CrmEventsService,
+	) {}
 
 	// ==================== STAGES ====================
 
@@ -94,6 +98,14 @@ export class CrmController {
 	@UseGuards(JwtAuthGuard)
 	async sendMedia(@Req() req, @Param("id") id: string, @Body() body: { base64: string; caption?: string; mediaType?: string }) {
 		return this.svc.sendMedia(req.user.id, Number(id), body.base64, body.caption || "", body.mediaType || "image");
+	}
+
+	// ==================== SSE (real-time events) ====================
+
+	@Sse("events")
+	@UseGuards(JwtAuthGuard)
+	sseEvents(@Req() req) {
+		return this.events.subscribe(req.user.id);
 	}
 
 	// ==================== WEBHOOK (public - called by Evolution) ====================

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { DatabaseService } from "~/database/database.service";
 import { WhatsappService } from "~/whatsapp/whatsapp.service";
+import { CrmEventsService } from "./crm-events.service";
 
 @Injectable()
 export class CrmService implements OnModuleInit {
@@ -9,6 +10,7 @@ export class CrmService implements OnModuleInit {
 	constructor(
 		private readonly db: DatabaseService,
 		private readonly whatsapp: WhatsappService,
+		private readonly events: CrmEventsService,
 	) {}
 
 	async onModuleInit() {
@@ -337,6 +339,22 @@ export class CrmService implements OnModuleInit {
 		);
 
 		this.logger.log(`Message saved: ${phone} (${fromMe ? "out" : "in"}) via ${instanceName}`);
+
+		// Emit real-time event
+		this.events.emit({
+			userId,
+			type: "new_message",
+			data: {
+				contactId: contact.id,
+				phone,
+				contactName: pushName || phone,
+				messageText,
+				messageType,
+				direction: fromMe ? "outgoing" : "incoming",
+				instanceName,
+			},
+		});
+
 		return { ok: true, contactId: contact.id, phone };
 	}
 }

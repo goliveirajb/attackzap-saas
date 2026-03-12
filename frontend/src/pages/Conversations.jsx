@@ -48,7 +48,7 @@ const msgTypeIcon = (type) => {
 };
 
 export default function Conversations() {
-  const { authFetch } = useAuth();
+  const { authFetch, subscribeEvents } = useAuth();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -60,7 +60,6 @@ export default function Conversations() {
       const res = await authFetch("/api/crm/contacts");
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
-      // Sort by last_message_at desc
       list.sort((a, b) => {
         const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
         const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
@@ -76,9 +75,19 @@ export default function Conversations() {
 
   useEffect(() => { load(); }, []);
 
-  // Poll contacts every 5s
+  // Real-time updates via SSE - refresh contacts when new message arrives
   useEffect(() => {
-    const iv = setInterval(load, 5000);
+    if (!subscribeEvents) return;
+    return subscribeEvents((event) => {
+      if (event.type === "new_message") {
+        load();
+      }
+    });
+  }, [subscribeEvents]);
+
+  // Fallback poll every 30s (longer interval since SSE handles real-time)
+  useEffect(() => {
+    const iv = setInterval(load, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -193,6 +202,7 @@ export default function Conversations() {
             contact={activeChat}
             authFetch={authFetch}
             onBack={closeChat}
+            subscribeEvents={subscribeEvents}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center">
@@ -210,7 +220,7 @@ export default function Conversations() {
 
 
 // ======================== CHAT PANEL ========================
-function ChatPanel({ contact: initialContact, authFetch, onBack }) {
+function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents }) {
   const [contact, setContact] = useState(initialContact);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -254,9 +264,20 @@ function ChatPanel({ contact: initialContact, authFetch, onBack }) {
     setLoading(true);
     setMessages([]);
     loadMessages();
-    pollRef.current = setInterval(loadMessages, 3000);
+    // Fallback poll every 30s
+    pollRef.current = setInterval(loadMessages, 30000);
     return () => clearInterval(pollRef.current);
   }, [loadMessages]);
+
+  // Real-time: reload messages when SSE event for this contact arrives
+  useEffect(() => {
+    if (!subscribeEvents) return;
+    return subscribeEvents((event) => {
+      if (event.type === "new_message" && event.contactId === contact.id) {
+        loadMessages();
+      }
+    });
+  }, [subscribeEvents, contact.id, loadMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
