@@ -387,27 +387,6 @@ export class CrmService implements OnModuleInit {
 		} catch {}
 	}
 
-	// ==================== DEBUG ====================
-
-	async debugInstances() {
-		return this.whatsapp.debugInstances();
-	}
-
-	async fixWebhookForInstance(name: string) {
-		return this.whatsapp.autoConfigureCrmWebhook(name, true);
-	}
-
-	async fixAllWebhooks() {
-		const pool = this.db.getPool();
-		const [rows] = await pool.query(`SELECT instance_name FROM whatsapp_instances`);
-		const results: any[] = [];
-		for (const row of rows as any[]) {
-			const res = await this.whatsapp.autoConfigureCrmWebhook(row.instance_name, true);
-			results.push({ instance: row.instance_name, ...res });
-		}
-		return results;
-	}
-
 	// ==================== WEBHOOK (Evolution) ====================
 
 	async processIncomingMessage(payload: any) {
@@ -459,13 +438,7 @@ export class CrmService implements OnModuleInit {
 		);
 		const instance = (instances as any[])[0];
 		if (!instance) {
-			// Log all instances in DB to help debug
-			const [allInstances] = await pool.query(
-				`SELECT id, instance_name, instance_key, display_name FROM whatsapp_instances`,
-			);
-			this.logger.warn(
-				`Webhook: instance not found for name="${instanceName}". DB instances: ${JSON.stringify(allInstances)}`,
-			);
+			this.logger.warn(`Webhook: instance not found for name="${instanceName}"`);
 			return { ignored: true, reason: "instance not found" };
 		}
 

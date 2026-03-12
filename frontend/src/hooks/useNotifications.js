@@ -22,11 +22,9 @@ export function useNotifications(token) {
         eventSourceRef.current.close();
       }
 
-      console.log("[SSE] Connecting...");
       const es = new EventSource(`/api/crm/events?token=${token}`);
 
       es.onopen = () => {
-        console.log("[SSE] Connected");
         setConnected(true);
       };
 
@@ -36,8 +34,6 @@ export function useNotifications(token) {
 
           // Skip heartbeat events
           if (data.type === "heartbeat") return;
-
-          console.log("[SSE] Event:", data.type, data.contactId);
 
           // Dispatch to all listeners immediately
           listenersRef.current.forEach((fn) => fn(data));
@@ -59,13 +55,10 @@ export function useNotifications(token) {
               } catch {}
             }
           }
-        } catch (err) {
-          console.warn("[SSE] Parse error:", err);
-        }
+        } catch {}
       };
 
       es.onerror = () => {
-        console.log("[SSE] Disconnected, reconnecting in 1s...");
         setConnected(false);
         es.close();
         eventSourceRef.current = null;

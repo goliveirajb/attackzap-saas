@@ -264,7 +264,6 @@ export class WhatsappService {
 	// number must be full JID: 5511999999999@s.whatsapp.net or groupid@g.us
 	async getProfilePicture(instanceName: string, number: string): Promise<string | null> {
 		try {
-			this.logger.log(`Fetching profile pic: instance=${instanceName}, number=${number}`);
 			const res = await fetch(
 				`${this.evolutionUrl}/chat/fetchProfilePictureUrl/${instanceName}`,
 				{
@@ -277,16 +276,10 @@ export class WhatsappService {
 				},
 			);
 
-			if (!res.ok) {
-				const errText = await res.text().catch(() => "");
-				this.logger.warn(`Profile pic fetch failed (${res.status}): ${errText}`);
-				return null;
-			}
+			if (!res.ok) return null;
 			const data = await res.json();
-			this.logger.log(`Profile pic response: ${JSON.stringify(data)}`);
 			return data?.profilePictureUrl || null;
-		} catch (err) {
-			this.logger.error(`Profile pic error: ${err.message}`);
+		} catch {
 			return null;
 		}
 	}
@@ -348,32 +341,6 @@ export class WhatsappService {
 		}
 	}
 
-	// Debug: mostrar todas instancias no banco (para diagnosticar webhook)
-	async debugInstances() {
-		const pool = this.db.getPool();
-		const [rows] = await pool.query(
-			`SELECT id, user_id, instance_name, instance_key, display_name, status, webhook_url FROM whatsapp_instances`,
-		);
-
-		// Also fetch Evolution API instances list
-		let evolutionInstances = null;
-		try {
-			const res = await fetch(`${this.evolutionUrl}/instance/fetchInstances`, {
-				method: "GET",
-				headers: { apikey: this.evolutionKey },
-			});
-			if (res.ok) {
-				evolutionInstances = await res.json();
-			}
-		} catch {}
-
-		return {
-			db_instances: rows,
-			evolution_instances: evolutionInstances,
-			api_base_url: process.env.API_BASE_URL || process.env.WEBHOOK_BASE_URL || "(not set)",
-		};
-	}
-
 	// Listar instancias do usuario
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();
@@ -384,17 +351,6 @@ export class WhatsappService {
 			[userId],
 		);
 		return rows;
-	}
-
-	// Corrigir instance_name no banco (caso tenha sido corrompido pelo rename antigo)
-	async fixInstanceName(instanceId: number, correctName: string) {
-		const pool = this.db.getPool();
-		await pool.query(
-			`UPDATE whatsapp_instances SET instance_name = ? WHERE id = ?`,
-			[correctName, instanceId],
-		);
-		this.logger.log(`Instance ${instanceId} instance_name fixed to: ${correctName}`);
-		return { ok: true, instance_name: correctName };
 	}
 
 	// Renomear instancia (apenas display name, instance_name fica como o nome real na Evolution)

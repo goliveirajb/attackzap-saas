@@ -155,39 +155,8 @@ export class CrmController {
 
 	// ==================== WEBHOOK (public - called by Evolution) ====================
 
-	// Test endpoint - access GET /api/crm/webhook to verify route is reachable
-	@Get("webhook")
-	webhookTest() {
-		return { ok: true, message: "CRM webhook endpoint is reachable", timestamp: new Date().toISOString() };
-	}
-
-	// Debug endpoint (public) - shows DB instances vs Evolution instances
-	@Get("debug/instances")
-	async debugInstances() {
-		return this.svc.debugInstances();
-	}
-
-	// Fix webhook for a specific instance (public - for debugging)
-	@Post("debug/fix-webhook/:name")
-	async debugFixWebhook(@Param("name") name: string) {
-		return this.svc.fixWebhookForInstance(name);
-	}
-
-	// Fix webhook for ALL instances (public - for debugging)
-	@Post("debug/fix-all-webhooks")
-	async debugFixAllWebhooks() {
-		return this.svc.fixAllWebhooks();
-	}
-
 	@Post("webhook")
 	async webhook(@Body() body: any) {
-		console.log("[CRM WEBHOOK] Received:", JSON.stringify({
-			event: body?.event,
-			instance: body?.instance,
-			remoteJid: body?.data?.key?.remoteJid,
-			fromMe: body?.data?.key?.fromMe,
-			hasData: !!body?.data,
-		}));
 		return this.svc.processIncomingMessage(body);
 	}
 }

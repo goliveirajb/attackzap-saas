@@ -1,10 +1,12 @@
-import { Controller, Post, Get, Delete, Patch, Body, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Post, Get, Delete, Patch, Body, Param, Req, UseGuards, Logger } from "@nestjs/common";
 import { N8nService } from "./n8n.service";
 import { JwtAuthGuard } from "~/auth/jwt-auth.guard";
 
 @Controller("automations")
 @UseGuards(JwtAuthGuard)
 export class N8nController {
+	private readonly logger = new Logger(N8nController.name);
+
 	constructor(private readonly n8nService: N8nService) {}
 
 	// Cria workflow N8N + conecta webhook Evolution automaticamente
@@ -31,7 +33,7 @@ export class N8nController {
 				result.webhookUrl,
 			);
 		} catch (err) {
-			console.error("Webhook Evolution falhou (não bloqueante):", err.message);
+			this.logger.error(`Webhook Evolution falhou (não bloqueante): ${err.message}`);
 		}
 
 		return result;
