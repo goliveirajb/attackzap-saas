@@ -434,7 +434,7 @@ export class CrmService implements OnModuleInit {
 			this.push.sendToUser(userId, {
 				title,
 				body: body.slice(0, 100),
-				data: { contactId: contact.id, url: "/conversations" },
+				data: { contactId: contact.id, url: "/app/conversations" },
 			}).catch((err) => this.logger.error(`Push error: ${err.message}`));
 		}
 

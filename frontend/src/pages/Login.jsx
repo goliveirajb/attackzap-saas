@@ -23,7 +23,7 @@ export default function Login() {
         await login(email, password);
         toast.success("Login realizado!");
       }
-      navigate("/");
+      navigate("/app");
     } catch (err) {
       toast.error(err.message || "Erro");
     } finally {

@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useState } from "react";
 import {
@@ -19,32 +19,32 @@ const getMenuSections = (role) => {
     {
       label: "GERAL",
       links: [
-        { to: "/", label: "Dashboard", icon: FaHome },
+        { to: "/app", label: "Dashboard", icon: FaHome },
       ],
     },
     {
       label: "CRM",
       links: [
-        { to: "/conversations", label: "Conversas", icon: FaComments },
-        { to: "/crm", label: "Contatos", icon: FaUsers },
+        { to: "/app/conversations", label: "Conversas", icon: FaComments },
+        { to: "/app/crm", label: "Contatos", icon: FaUsers },
       ],
     },
     {
       label: "WHATSAPP",
       links: [
-        { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
+        { to: "/app/instances", label: "Conexoes", icon: FaWhatsapp },
       ],
     },
     {
       label: "AUTOMACOES",
       links: [
-        { to: "/flows", label: "Fluxos", icon: FaProjectDiagram },
+        { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
       ],
     },
     {
       label: "SISTEMA",
       links: [
-        { to: "/settings", label: "Configuracoes", icon: FaCog },
+        { to: "/app/settings", label: "Configuracoes", icon: FaCog },
       ],
     },
   ];
@@ -53,7 +53,7 @@ const getMenuSections = (role) => {
     sections.push({
       label: "ADMIN",
       links: [
-        { to: "/admin", label: "Gerenciar Clientes", icon: FaUserShield },
+        { to: "/app/admin", label: "Gerenciar Clientes", icon: FaUserShield },
       ],
     });
   }
@@ -64,11 +64,11 @@ const getMenuSections = (role) => {
 // Bottom nav items for mobile
 const getBottomNavItems = () => {
   const items = [
-    { to: "/", label: "Inicio", icon: FaHome },
-    { to: "/conversations", label: "Conversas", icon: FaComments },
-    { to: "/crm", label: "Contatos", icon: FaUsers },
-    { to: "/instances", label: "Conexoes", icon: FaWhatsapp },
-    { to: "/settings", label: "Config", icon: FaCog },
+    { to: "/app", label: "Inicio", icon: FaHome },
+    { to: "/app/conversations", label: "Conversas", icon: FaComments },
+    { to: "/app/crm", label: "Contatos", icon: FaUsers },
+    { to: "/app/instances", label: "Conexoes", icon: FaWhatsapp },
+    { to: "/app/settings", label: "Config", icon: FaCog },
   ];
   return items;
 };
@@ -76,7 +76,6 @@ const getBottomNavItems = () => {
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
@@ -86,8 +85,6 @@ export default function Layout() {
   };
 
   const closeMobile = () => setMobileOpen(false);
-
-  const isConversationsPage = location.pathname === "/conversations";
 
   // All menu links flattened for the collapsed sidebar
   const allLinks = getMenuSections(user?.role).flatMap((s) => s.links);
@@ -136,7 +133,7 @@ export default function Layout() {
                     <NavLink
                       key={link.to}
                       to={link.to}
-                      end={link.to === "/"}
+                      end={link.to === "/app"}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                           isActive
@@ -158,7 +155,7 @@ export default function Layout() {
                 <NavLink
                   key={link.to}
                   to={link.to}
-                  end={link.to === "/"}
+                  end={link.to === "/app"}
                   title={link.label}
                   className={({ isActive }) =>
                     `w-11 h-11 flex items-center justify-center rounded-xl transition-all ${
@@ -224,7 +221,7 @@ export default function Layout() {
                   <NavLink
                     key={link.to}
                     to={link.to}
-                    end={link.to === "/"}
+                    end={link.to === "/app"}
                     onClick={closeMobile}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
@@ -253,9 +250,9 @@ export default function Layout() {
       </aside>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Mobile header */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border">
+        <header id="mobile-header" className="md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border flex-shrink-0">
           <button onClick={() => setMobileOpen(true)} className="text-gray-400 hover:text-white">
             <FaBars size={18} />
           </button>
@@ -263,34 +260,32 @@ export default function Layout() {
           <div className="w-6" />
         </header>
 
-        <main className={`flex-1 overflow-y-auto p-3 md:p-6 ${!isConversationsPage ? "pb-20 md:pb-6" : "pb-0 md:pb-6"}`}>
+        <main id="main-content" className="flex-1 overflow-y-auto p-3 md:p-6 pb-16 md:pb-6">
           <Outlet />
         </main>
 
-        {/* Bottom Navigation - Mobile only, hidden on conversations page */}
-        {!isConversationsPage && (
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-dark-card border-t border-dark-border safe-area-bottom">
-            <div className="flex items-center justify-around px-1 py-1.5">
-              {getBottomNavItems().map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/"}
-                  className={({ isActive }) =>
-                    `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all ${
-                      isActive
-                        ? "text-primary"
-                        : "text-gray-500"
-                    }`
-                  }
-                >
-                  <item.icon size={18} />
-                  <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </nav>
-        )}
+        {/* Bottom Navigation - Mobile only, hidden via CSS class when chat is open */}
+        <nav id="bottom-nav" className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-dark-card border-t border-dark-border safe-area-bottom">
+          <div className="flex items-center justify-around px-1 py-1.5">
+            {getBottomNavItems().map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/app"}
+                className={({ isActive }) =>
+                  `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all ${
+                    isActive
+                      ? "text-primary"
+                      : "text-gray-500"
+                  }`
+                }
+              >
+                <item.icon size={18} />
+                <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </nav>
       </div>
     </div>
   );

@@ -13,16 +13,17 @@ import Admin from "./pages/Admin";
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
-  return token ? children : <Navigate to="/login" replace />;
+  return token ? children : <Navigate to="/login" replace state={{ from: "/app" }} />;
 }
 
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/home" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route
-        path="/"
+        path="/app"
         element={
           <PrivateRoute>
             <Layout />

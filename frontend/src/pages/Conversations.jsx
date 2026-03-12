@@ -104,20 +104,35 @@ export default function Conversations() {
 
   const openChat = (c) => {
     setActiveChat(c);
-    // Zero unread locally immediately (like WhatsApp)
     if (Number(c.unread_count) > 0) {
       setContacts((prev) => prev.map((ct) => ct.id === c.id ? { ...ct, unread_count: 0 } : ct));
     }
   };
   const closeChat = () => { setActiveChat(null); load(); };
 
-  // Total unread count for parent components
-  const totalUnread = useMemo(() => contacts.reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0), [contacts]);
+  // Hide/show bottom nav + mobile header when chat is open (mobile)
+  useEffect(() => {
+    const nav = document.getElementById("bottom-nav");
+    const header = document.getElementById("mobile-header");
+    const main = document.getElementById("main-content");
+    if (activeChat) {
+      if (nav) nav.style.display = "none";
+      if (header) header.style.display = "none";
+      if (main) { main.style.padding = "0"; main.style.overflow = "hidden"; }
+    } else {
+      if (nav) nav.style.display = "";
+      if (header) header.style.display = "";
+      if (main) { main.style.padding = ""; main.style.overflow = ""; }
+    }
+    return () => {
+      if (nav) nav.style.display = "";
+      if (header) header.style.display = "";
+      if (main) { main.style.padding = ""; main.style.overflow = ""; }
+    };
+  }, [activeChat]);
 
-  // ===================== MOBILE: show chat or list =====================
-  // Desktop: side by side | Mobile: one at a time
   return (
-    <div className="h-[calc(100vh-48px)] md:h-[calc(100vh-48px)] flex rounded-2xl overflow-hidden border border-dark-border bg-dark-card">
+    <div className={`flex overflow-hidden border border-dark-border bg-dark-card md:rounded-2xl ${activeChat ? "fixed inset-0 z-40 md:static md:z-auto md:h-full" : "h-full rounded-2xl"}`}>
       {/* ===== CHAT LIST (left panel) ===== */}
       <div className={`w-full md:w-[360px] lg:w-[400px] flex-shrink-0 flex flex-col border-r border-dark-border bg-dark-card
         ${activeChat ? "hidden md:flex" : "flex"}`}>

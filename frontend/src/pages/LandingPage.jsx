@@ -83,7 +83,7 @@ export default function LandingPage() {
   const { register } = useAuth();
 
   if (token) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const handleSelectPlan = (planId) => {
@@ -101,7 +101,7 @@ export default function LandingPage() {
     try {
       await register(form.name, form.email, form.password, selectedPlan);
       toast.success("Conta criada com sucesso!");
-      navigate("/");
+      navigate("/app");
     } catch (err) {
       toast.error(err.message || "Erro ao registrar");
     } finally {

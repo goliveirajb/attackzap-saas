@@ -68,7 +68,7 @@ self.addEventListener("notificationclick", (e) => {
 
   if (e.action === "close") return;
 
-  const url = e.notification.data?.url || "/conversations";
+  const url = e.notification.data?.url || "/app/conversations";
 
   e.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
