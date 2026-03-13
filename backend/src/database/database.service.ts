@@ -215,6 +215,18 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN archived TINYINT(1) DEFAULT 0 AFTER pinned
 		`).catch(() => {});
 
+		// One-time migration: clear auto-set pushName from non-group contacts
+		// After this, names are only set when user manually saves the contact
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS migrations (name VARCHAR(100) PRIMARY KEY, ran_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+		`).catch(() => {});
+		const [migRows] = await pool.query(`SELECT 1 FROM migrations WHERE name = 'clear_pushnames'`).catch(() => [[]] as any);
+		if (!(migRows as any[]).length) {
+			await pool.query(`UPDATE contacts SET name = NULL WHERE is_group = 0 AND name IS NOT NULL`).catch(() => {});
+			await pool.query(`INSERT INTO migrations (name) VALUES ('clear_pushnames')`).catch(() => {});
+			this.logger.log("Migration: cleared auto-set pushNames from contacts");
+		}
+
 		// Quick replies table
 		await pool.query(`
 			CREATE TABLE IF NOT EXISTS quick_replies (
