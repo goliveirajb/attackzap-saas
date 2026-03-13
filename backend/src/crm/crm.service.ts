@@ -247,7 +247,7 @@ export class CrmService implements OnModuleInit {
 	async getMessageMedia(messageId: number, userId: number) {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
-			`SELECT cm.raw_data, cm.message_type, cm.direction
+			`SELECT cm.raw_data, cm.message_type, cm.direction, cm.instance_name
 			 FROM contact_messages cm
 			 WHERE cm.id = ? AND cm.user_id = ?`,
 			[messageId, userId],
@@ -263,7 +263,6 @@ export class CrmService implements OnModuleInit {
 		}
 
 		// Incoming from Evolution webhook: extract base64 from message object
-		// Evolution may nest data differently depending on version
 		const msgObj = raw.message || raw;
 		let base64 = null;
 		let mimetype = null;
@@ -288,6 +287,17 @@ export class CrmService implements OnModuleInit {
 
 		// Fallback: try top-level base64
 		if (!base64) base64 = msgObj.base64 || raw.base64;
+
+		// Fallback: fetch base64 from Evolution API if not in webhook payload
+		if (!base64 && msg.instance_name && raw.key) {
+			this.logger.log(`Fetching media from Evolution API for message ${messageId}`);
+			const result = await this.whatsapp.getBase64FromMedia(msg.instance_name, raw);
+			if (result) {
+				base64 = result.base64;
+				mimetype = result.mimetype;
+			}
+		}
+
 		// Fallback mimetype
 		if (!mimetype) {
 			const defaults = { image: "image/jpeg", video: "video/mp4", audio: "audio/ogg", document: "application/octet-stream" };

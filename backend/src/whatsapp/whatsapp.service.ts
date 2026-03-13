@@ -284,6 +284,33 @@ export class WhatsappService {
 		}
 	}
 
+	// Buscar base64 de midia via Evolution API (fallback quando webhook nao envia base64)
+	async getBase64FromMedia(instanceName: string, messageData: any): Promise<{ base64: string; mimetype: string } | null> {
+		try {
+			const res = await fetch(
+				`${this.evolutionUrl}/chat/getBase64FromMediaMessage/${instanceName}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						apikey: this.evolutionKey,
+					},
+					body: JSON.stringify({ message: messageData }),
+				},
+			);
+
+			if (!res.ok) {
+				this.logger.warn(`getBase64FromMedia failed (${res.status})`);
+				return null;
+			}
+			const data = await res.json();
+			return data?.base64 ? { base64: data.base64, mimetype: data.mimetype || "" } : null;
+		} catch (err) {
+			this.logger.error(`getBase64FromMedia error: ${err.message}`);
+			return null;
+		}
+	}
+
 	// Verificar webhook configurado na Evolution
 	async checkWebhook(instanceName: string) {
 		try {
