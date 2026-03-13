@@ -5,7 +5,7 @@ import {
   FaUsers, FaPlus, FaTrash, FaPen, FaTimes, FaWhatsapp, FaSearch,
   FaSpinner, FaComments, FaColumns, FaList, FaUserPlus, FaPaperPlane,
   FaPhone, FaEnvelope, FaTags, FaStickyNote, FaGripVertical, FaCheck,
-  FaCheckDouble, FaArrowLeft, FaEllipsisV, FaSmile,
+  FaCheckDouble, FaArrowLeft, FaEllipsisV, FaSmile, FaFilter,
 } from "react-icons/fa";
 
 // ======================== MAIN CRM COMPONENT ========================
@@ -15,6 +15,7 @@ export default function CRM() {
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterStageId, setFilterStageId] = useState("all");
   const [viewMode, setViewMode] = useState("kanban");
 
   // Chat
@@ -64,16 +65,26 @@ export default function CRM() {
   useEffect(() => { load(); }, []);
 
   const filteredContacts = useMemo(() => {
-    if (!search.trim()) return contacts;
-    const q = search.toLowerCase();
-    return contacts.filter(
-      (c) =>
-        (c.name && c.name.toLowerCase().includes(q)) ||
-        c.phone.includes(q) ||
-        (c.email && c.email.toLowerCase().includes(q)) ||
-        (c.tags && c.tags.toLowerCase().includes(q))
-    );
-  }, [contacts, search]);
+    let list = contacts;
+    if (filterStageId !== "all") {
+      if (filterStageId === "none") {
+        list = list.filter((c) => !c.stage_id);
+      } else {
+        list = list.filter((c) => c.stage_id === Number(filterStageId));
+      }
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          c.phone.includes(q) ||
+          (c.email && c.email.toLowerCase().includes(q)) ||
+          (c.tags && c.tags.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [contacts, search, filterStageId]);
 
   const contactsByStage = useMemo(() => {
     const map = {};
@@ -325,6 +336,15 @@ export default function CRM() {
               className="pl-8 pr-4 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary w-full md:w-48"
             />
           </div>
+          <div className="relative flex-shrink-0">
+            <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none" />
+            <select value={filterStageId} onChange={(e) => setFilterStageId(e.target.value)}
+              className="pl-8 pr-3 py-2 rounded-lg border border-dark-border bg-dark-cardSoft text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer">
+              <option value="all">Todas etapas</option>
+              <option value="none">Sem etapa</option>
+              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
           <div className="flex bg-dark-cardSoft rounded-lg border border-dark-border overflow-hidden">
             <button onClick={() => setViewMode("kanban")}
               className={`px-3 py-2 text-xs transition ${viewMode === "kanban" ? "bg-primary text-white" : "text-gray-400 hover:text-white"}`}>
@@ -484,7 +504,7 @@ export default function CRM() {
 
       {/* ===== LIST VIEW ===== */}
       {viewMode === "list" && (
-        <div className="bg-dark-card border border-dark-border rounded-xl overflow-hidden">
+        <div className="flex-1 bg-dark-card border border-dark-border rounded-xl overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
           {/* Mobile: cards | Desktop: table */}
           <div className="md:hidden space-y-2 p-2">
             {filteredContacts.map((c) => (
@@ -517,7 +537,7 @@ export default function CRM() {
           </div>
 
           <table className="w-full text-sm hidden md:table">
-            <thead>
+            <thead className="sticky top-0 bg-dark-card z-10">
               <tr className="border-b border-dark-border">
                 <th className="text-left px-4 py-3 text-[10px] text-gray-500 uppercase font-medium">Contato</th>
                 <th className="text-left px-4 py-3 text-[10px] text-gray-500 uppercase font-medium">Telefone</th>
