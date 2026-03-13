@@ -9,6 +9,33 @@ import {
   FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack, FaArchive,
 } from "react-icons/fa";
 
+// Send sound - short "whoosh" tone
+let _sendAudio = null;
+function playSendSound() {
+  try {
+    if (!_sendAudio) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const sr = ctx.sampleRate;
+      const len = Math.floor(sr * 0.15); // 150ms
+      const buf = ctx.createBuffer(1, len, sr);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const freq = 600 + t * 3000; // rising sweep 600→1050Hz
+        const env = Math.pow(1 - i / len, 2); // quick decay
+        d[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.3;
+      }
+      _sendAudio = { ctx, buf };
+    }
+    const { ctx, buf } = _sendAudio;
+    if (ctx.state === "suspended") ctx.resume();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start();
+  } catch {}
+}
+
 const EMOJI_LIST = [
   "😀","😂","🤣","😊","😍","🥰","😘","😜","🤔","😎",
   "🤩","🥳","😇","🤗","🤭","😏","😌","😴","🤮","😷",
@@ -789,6 +816,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     setText("");
     setSending(true);
 
+    playSendSound();
     const tempMsg = {
       id: Date.now(), direction: "outgoing", message_text: msg,
       message_type: "text", created_at: new Date().toISOString(), _sending: true,
@@ -821,6 +849,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     if (file.size > maxSize) return toast.error("Arquivo muito grande (max 15MB)");
 
     setUploadingMedia(true);
+    playSendSound();
     const toastId = toast.loading("Enviando arquivo...");
 
     try {
@@ -930,6 +959,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
 
         // Send audio - strip data URL prefix, Evolution expects raw base64
         setUploadingMedia(true);
+        playSendSound();
         const toastId = toast.loading("Enviando audio...");
         try {
           const cleanBase64 = base64.replace(/^data:[^,]+,/, "");
