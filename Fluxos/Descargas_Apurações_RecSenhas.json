@@ -9,7 +9,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"mediatype\": \"document\",\n  \"mimetype\": \"{{ $json.mimetype }}\",\n  \"media\": \"{{ $json.media }}\",\n  \"caption\": \"{{ $json.caption }}\",\n  \"fileName\": \"{{ $json.fileName }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.number, mediatype: 'document', mimetype: $json.mimetype, media: $json.media, caption: $json.caption, fileName: $json.fileName }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -22,7 +22,7 @@
       "name": "Enviar documento HTTP",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "dha86BZYO0fZLdUj",
+          "id": "coL5OfyPrZASmht3",
           "name": "AUTOBOT"
         }
       }
@@ -75,7 +75,6 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "AUTOBOT",
-        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -87,13 +86,7 @@
       ],
       "id": "b7d9c13c-7963-4742-a070-d6318a9d3935",
       "name": "Webhook1",
-      "webhookId": "ef3a57e3-a61f-41f8-a831-85bed488a1c4",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "dha86BZYO0fZLdUj",
-          "name": "AUTOBOT"
-        }
-      }
+      "webhookId": "ef3a57e3-a61f-41f8-a831-85bed488a1c4"
     },
     {
       "parameters": {
@@ -177,7 +170,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"text\": \"{{ $json.text }}\"\n}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.number, text: $json.text }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -190,7 +183,7 @@
       "name": "Enviar texto HTTP",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "dha86BZYO0fZLdUj",
+          "id": "coL5OfyPrZASmht3",
           "name": "AUTOBOT"
         }
       }
