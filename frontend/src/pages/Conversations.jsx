@@ -460,13 +460,13 @@ export default function Conversations() {
                       <p className={`text-sm truncate ${unread > 0 ? "font-bold text-white" : "font-semibold text-white"}`}>
                         {c.name || c.phone}
                       </p>
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                        <span className={`text-[10px] ${
-                          unread > 0 ? "text-green-400 font-semibold" : c.last_message_at ? "text-primary" : "text-gray-600"
+                      {formatChatDate(c.last_message_at) && (
+                        <span className={`text-[10px] flex-shrink-0 ml-2 ${
+                          unread > 0 ? "text-green-400 font-semibold" : "text-primary"
                         }`}>
                           {formatChatDate(c.last_message_at)}
                         </span>
-                      </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <p className={`text-xs truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
