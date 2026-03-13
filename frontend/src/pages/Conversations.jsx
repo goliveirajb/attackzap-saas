@@ -631,31 +631,37 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     if (!subscribeEvents) return;
     return subscribeEvents((event) => {
       if (event.type === "new_message" && event.contactId === contact.id) {
-        // Insert message directly into state for instant display
-        const newMsg = {
-          id: Date.now() + Math.random(),
-          contact_id: contact.id,
-          direction: event.direction,
-          message_text: event.messageText,
-          message_type: event.messageType,
-          created_at: event.createdAt || new Date().toISOString(),
-          has_media: 0,
-        };
-        setMessages((prev) => {
-          // Avoid duplicate if message was already added (e.g. own sent message)
-          const isDuplicate = prev.some((m) =>
-            m.message_text === newMsg.message_text &&
-            m.direction === newMsg.direction &&
-            Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 3000
-          );
-          if (isDuplicate) return prev;
-          return [...prev, newMsg];
-        });
+        const isMediaMsg = ["image", "video", "audio", "document"].includes(event.messageType);
+
+        if (isMediaMsg) {
+          // Media messages need real DB id for fetching base64 - reload from server
+          loadMessages();
+        } else {
+          // Text messages: insert directly for instant display
+          const newMsg = {
+            id: Date.now() + Math.random(),
+            contact_id: contact.id,
+            direction: event.direction,
+            message_text: event.messageText,
+            message_type: event.messageType,
+            created_at: event.createdAt || new Date().toISOString(),
+            has_media: 0,
+          };
+          setMessages((prev) => {
+            const isDuplicate = prev.some((m) =>
+              m.message_text === newMsg.message_text &&
+              m.direction === newMsg.direction &&
+              Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 3000
+            );
+            if (isDuplicate) return prev;
+            return [...prev, newMsg];
+          });
+        }
         // Mark as read since we're viewing
         authFetch(`/api/crm/contacts/${contact.id}/read`, { method: "PUT" }).catch(() => {});
       }
     });
-  }, [subscribeEvents, contact.id]);
+  }, [subscribeEvents, contact.id, loadMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

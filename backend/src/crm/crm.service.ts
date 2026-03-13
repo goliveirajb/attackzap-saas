@@ -263,22 +263,35 @@ export class CrmService implements OnModuleInit {
 		}
 
 		// Incoming from Evolution webhook: extract base64 from message object
+		// Evolution may nest data differently depending on version
 		const msgObj = raw.message || raw;
 		let base64 = null;
 		let mimetype = null;
 
-		if (msg.message_type === "image" && msgObj.imageMessage) {
-			base64 = msgObj.imageMessage.base64 || msgObj.base64;
-			mimetype = msgObj.imageMessage.mimetype || "image/jpeg";
-		} else if (msg.message_type === "video" && msgObj.videoMessage) {
-			base64 = msgObj.videoMessage.base64 || msgObj.base64;
-			mimetype = msgObj.videoMessage.mimetype || "video/mp4";
-		} else if (msg.message_type === "audio" && msgObj.audioMessage) {
-			base64 = msgObj.audioMessage.base64 || msgObj.base64;
-			mimetype = msgObj.audioMessage.mimetype || "audio/ogg";
-		} else if (msg.message_type === "document" && msgObj.documentMessage) {
-			base64 = msgObj.documentMessage.base64 || msgObj.base64;
-			mimetype = msgObj.documentMessage.mimetype || "application/octet-stream";
+		// Map message type to possible field names
+		const mediaFields = {
+			image: ["imageMessage"],
+			video: ["videoMessage"],
+			audio: ["audioMessage", "pttMessage"],
+			document: ["documentMessage"],
+		};
+
+		const fields = mediaFields[msg.message_type] || [];
+		for (const field of fields) {
+			const media = msgObj[field];
+			if (media && media.base64) {
+				base64 = media.base64;
+				mimetype = media.mimetype;
+				break;
+			}
+		}
+
+		// Fallback: try top-level base64
+		if (!base64) base64 = msgObj.base64 || raw.base64;
+		// Fallback mimetype
+		if (!mimetype) {
+			const defaults = { image: "image/jpeg", video: "video/mp4", audio: "audio/ogg", document: "application/octet-stream" };
+			mimetype = defaults[msg.message_type] || "application/octet-stream";
 		}
 
 		if (!base64) return null;
@@ -517,6 +530,14 @@ export class CrmService implements OnModuleInit {
 		// Fetch profile pic in background if not yet stored
 		if (!contact.profile_pic_url) {
 			this.updateProfilePicInBackground(contact.id, userId, instanceName, phone, isGroup);
+		}
+
+		// Log media info for debugging
+		if (messageType !== "text") {
+			const msg = data?.message || {};
+			const mediaKey = messageType === "image" ? "imageMessage" : messageType === "video" ? "videoMessage" : messageType === "audio" ? "audioMessage" : "documentMessage";
+			const hasBase64 = !!(msg[mediaKey]?.base64);
+			this.logger.log(`Media message: type=${messageType}, hasBase64=${hasBase64}, keys=${Object.keys(msg).join(",")}`);
 		}
 
 		// Save message
