@@ -171,7 +171,13 @@ export default function Conversations() {
           const idx = prev.findIndex((c) => c.id === event.contactId);
           if (idx >= 0) {
             const updated = [...prev];
-            const contact = { ...updated[idx], last_message_at: event.createdAt };
+            const contact = {
+              ...updated[idx],
+              last_message_at: event.createdAt,
+              last_message_text: event.messageText || `[${event.messageType}]`,
+              last_message_type: event.messageType,
+              last_message_direction: event.direction,
+            };
             // Only increment unread if chat is NOT currently open
             if (event.direction === "incoming" && !isActiveChat) {
               contact.unread_count = (Number(contact.unread_count) || 0) + 1;
@@ -458,20 +464,24 @@ export default function Conversations() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className={`text-[16px] truncate ${unread > 0 ? "font-bold text-white" : "font-normal text-white"}`}>
+                      <p className={`text-[17px] leading-tight truncate ${unread > 0 ? "font-medium text-white" : "font-normal text-white"}`}>
                         {c.name || c.phone}
                       </p>
                       {formatChatDate(c.last_message_at) && (
-                        <span className={`text-xs flex-shrink-0 ml-2 ${
-                          unread > 0 ? "text-green-400 font-semibold" : "text-gray-500"
+                        <span className={`text-[13px] flex-shrink-0 ml-2 ${
+                          unread > 0 ? "text-green-400 font-medium" : "text-gray-500"
                         }`}>
                           {formatChatDate(c.last_message_at)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <p className={`text-sm truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
-                        {c.name ? c.phone : "Toque para abrir"}
+                      <p className={`text-[15px] truncate ${unread > 0 ? "text-gray-300" : "text-gray-500"}`}>
+                        {c.last_message_direction === "outgoing" && <FaCheck size={10} className="inline mr-1 text-gray-500" />}
+                        {c.last_message_type && c.last_message_type !== "text"
+                          ? <>{msgTypeIcon(c.last_message_type)}{c.last_message_text || `[${c.last_message_type}]`}</>
+                          : (c.last_message_text || (c.name ? c.phone : "Toque para abrir"))
+                        }
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                         {!!c.pinned && <FaThumbtack size={10} className="text-gray-500" />}
@@ -808,7 +818,10 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+      // Prefer mp4/ogg for better WhatsApp compatibility, fallback to webm
+      const mimeType = ["audio/mp4", "audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/webm"]
+        .find((m) => MediaRecorder.isTypeSupported(m)) || "";
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -821,7 +834,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
         clearInterval(recordingTimerRef.current);
         setRecordingTime(0);
 
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || "audio/webm" });
         if (blob.size < 1000) return; // too short, discard
 
         const base64 = await new Promise((resolve) => {

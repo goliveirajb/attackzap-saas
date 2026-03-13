@@ -216,6 +216,8 @@ export class WhatsappService {
 
 	// Enviar audio como voice note (PTT)
 	async sendAudio(instanceName: string, number: string, audioBase64: string) {
+		this.logger.log(`Sending audio to ${number} via ${instanceName} (size: ${Math.round(audioBase64.length / 1024)}KB)`);
+
 		const res = await fetch(
 			`${this.evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`,
 			{
@@ -231,7 +233,11 @@ export class WhatsappService {
 			},
 		);
 
-		if (!res.ok) throw new Error("Falha ao enviar audio");
+		if (!res.ok) {
+			const errText = await res.text().catch(() => "");
+			this.logger.error(`sendAudio error (${res.status}): ${errText}`);
+			throw new Error(`Falha ao enviar audio: ${res.status}`);
+		}
 		return await res.json();
 	}
 

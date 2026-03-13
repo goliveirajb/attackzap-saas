@@ -102,7 +102,16 @@ export class CrmService implements OnModuleInit {
 			         WHERE cm.contact_id = c.id
 			           AND cm.direction = 'incoming'
 			           AND cm.created_at > COALESCE(c.last_read_at, '1970-01-01')
-			        ) as unread_count
+			        ) as unread_count,
+			        (SELECT cm2.message_text FROM contact_messages cm2
+			         WHERE cm2.contact_id = c.id ORDER BY cm2.created_at DESC LIMIT 1
+			        ) as last_message_text,
+			        (SELECT cm3.message_type FROM contact_messages cm3
+			         WHERE cm3.contact_id = c.id ORDER BY cm3.created_at DESC LIMIT 1
+			        ) as last_message_type,
+			        (SELECT cm4.direction FROM contact_messages cm4
+			         WHERE cm4.contact_id = c.id ORDER BY cm4.created_at DESC LIMIT 1
+			        ) as last_message_direction
 			 FROM contacts c
 			 LEFT JOIN crm_stages cs ON c.stage_id = cs.id
 			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
@@ -483,10 +492,20 @@ export class CrmService implements OnModuleInit {
 		const stages = await this.getStages(userId);
 		const firstStage = (stages as any[])[0];
 
-		// For groups, extract group name from metadata (pushName is the sender's name, not the group name)
-		const contactName = isGroup
-			? (payload?.data?.groupMetadata?.subject || data?.groupMetadata?.subject || phone)
+		// For groups, extract group name from metadata or fetch from Evolution API
+		let contactName: string | null = isGroup
+			? (payload?.data?.groupMetadata?.subject || data?.groupMetadata?.subject || data?.groupJid?.subject || null)
 			: pushName;
+
+		// If group name not in webhook, try fetching from Evolution API
+		if (isGroup && !contactName && instanceName) {
+			try {
+				const groups = await this.whatsapp.getGroups(instanceName);
+				const group = groups.find((g: any) => g.id === remoteJid || g.id === phone + "@g.us");
+				if (group) contactName = group.name;
+			} catch {}
+		}
+		if (isGroup && !contactName) contactName = phone;
 
 		if (isGroup) {
 			// Groups: unique per (user_id, phone, instance_id) - each instance has its own groups
@@ -494,7 +513,7 @@ export class CrmService implements OnModuleInit {
 				`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
 				 VALUES (?, ?, ?, 1, ?, NULL, NOW())
 				 ON DUPLICATE KEY UPDATE
-				   name = COALESCE(name, VALUES(name)),
+				   name = COALESCE(VALUES(name), name),
 				   last_message_at = NOW(),
 				   updated_at = NOW()`,
 				[userId, instanceId, phone, contactName],
