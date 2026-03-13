@@ -41,6 +41,7 @@ const profilePicCache = {};
 const AVATAR_SIZES = {
   10: { cls: "w-10 h-10", icon: 16 },
   12: { cls: "w-12 h-12", icon: 18 },
+  13: { cls: "w-[52px] h-[52px]", icon: 20 },
   16: { cls: "w-16 h-16", icon: 24 },
 };
 
@@ -438,15 +439,15 @@ export default function Conversations() {
                 <div
                   key={c.id}
                   onClick={() => openChat(c)}
-                  className={`group flex items-center gap-3 px-4 py-3 cursor-pointer transition-all border-b border-dark-border/30 relative ${
+                  className={`group flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-all border-b border-dark-border/30 relative ${
                     isActive
                       ? "bg-primary/10 border-l-2 border-l-primary"
                       : "hover:bg-dark-cardSoft/50"
                   }`}
                 >
                   {/* Avatar */}
-                  <div className="relative w-12 h-12 flex-shrink-0">
-                    <ContactAvatar contact={c} size={12} textSize="text-sm" authFetch={authFetch} />
+                  <div className="relative w-[52px] h-[52px] flex-shrink-0">
+                    <ContactAvatar contact={c} size={13} textSize="text-base" authFetch={authFetch} />
                     {unread > 0 && (
                       <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
                         {unread > 99 ? "99+" : unread}
@@ -457,19 +458,19 @@ export default function Conversations() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className={`text-sm truncate ${unread > 0 ? "font-bold text-white" : "font-semibold text-white"}`}>
+                      <p className={`text-[16px] truncate ${unread > 0 ? "font-bold text-white" : "font-normal text-white"}`}>
                         {c.name || c.phone}
                       </p>
                       {formatChatDate(c.last_message_at) && (
-                        <span className={`text-[10px] flex-shrink-0 ml-2 ${
-                          unread > 0 ? "text-green-400 font-semibold" : "text-primary"
+                        <span className={`text-xs flex-shrink-0 ml-2 ${
+                          unread > 0 ? "text-green-400 font-semibold" : "text-gray-500"
                         }`}>
                           {formatChatDate(c.last_message_at)}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <p className={`text-xs truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className={`text-sm truncate ${unread > 0 ? "text-gray-300 font-medium" : "text-gray-500"}`}>
                         {c.name ? c.phone : "Toque para abrir"}
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
