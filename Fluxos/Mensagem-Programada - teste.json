@@ -1,0 +1,250 @@
+{
+  "name": "Mensagem-Programada - teste",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "msg-prog-teste-1773095437842",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        704
+      ],
+      "id": "wh-1773095437842",
+      "name": "Webhook",
+      "webhookId": "msg-prog-teste-1773095437842"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "number",
+              "value": "={{ $json.body.number || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "text",
+              "value": "={{ $json.body.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "caption",
+              "value": "={{ $json.body.caption || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "media",
+              "value": "={{ $json.body.media || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1136,
+        704
+      ],
+      "id": "ef-1773095437842",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($json.media || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -928,
+        704
+      ],
+      "id": "if-1773095437842",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evo.attackzap.com/message/sendMedia/teste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "9c7db8b42843b6d6b82b9260ecd2d727"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    number: $json.number,\n    mediatype: \"image\",\n    media: ($json.media || '').replace(/^data:[^,]+,/, ''),\n    caption: $json.caption || '',\n    fileName: \"image.jpg\"\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        640
+      ],
+      "id": "img-1773095437842",
+      "name": "Enviar imagem"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evo.attackzap.com/message/sendText/teste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "5500A395-004A-4170-BC91-702A09D5F4F4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    number: $json.number,\n    text: $json.text\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        816
+      ],
+      "id": "txt-1773095437842",
+      "name": "Enviar texto"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\":\"sucesso\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -192,
+        704
+      ],
+      "id": "rsp-1773095437842",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Enviar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar imagem": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2f063b70-79ed-4e0e-afda-4b89d585a068",
+  "meta": {
+    "instanceId": "68e5f56b1f4b624b7a9f7e6b2c2e71543b3bfa26a570d41061a6b8506afa9aea"
+  },
+  "id": "bd7wpMrDwH45PxkD",
+  "tags": []
+}
