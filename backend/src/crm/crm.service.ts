@@ -93,6 +93,44 @@ export class CrmService implements OnModuleInit {
 
 	// ==================== CONTACTS ====================
 
+	// Sync group names from Evolution API for groups that have phone number as name
+	async syncGroupNames(userId: number) {
+		const pool = this.db.getPool();
+		const [groups] = await pool.query(
+			`SELECT c.id, c.phone, c.name, wi.instance_name
+			 FROM contacts c
+			 JOIN whatsapp_instances wi ON c.instance_id = wi.id
+			 WHERE c.user_id = ? AND c.is_group = 1 AND (c.name = c.phone OR c.name IS NULL OR c.name = '')`,
+			[userId],
+		);
+
+		const groupsList = groups as any[];
+		if (!groupsList.length) return { updated: 0 };
+
+		// Fetch groups from all instances
+		const instanceNames = [...new Set(groupsList.map((g) => g.instance_name))];
+		const allEvolutionGroups: any[] = [];
+		for (const inst of instanceNames) {
+			try {
+				const evoGroups = await this.whatsapp.getGroups(inst);
+				allEvolutionGroups.push(...evoGroups);
+			} catch {}
+		}
+
+		let updated = 0;
+		for (const group of groupsList) {
+			const jid = group.phone + "@g.us";
+			const evoGroup = allEvolutionGroups.find((g) => g.id === jid || g.id === group.phone);
+			if (evoGroup?.name && evoGroup.name !== group.phone) {
+				await pool.query(`UPDATE contacts SET name = ? WHERE id = ?`, [evoGroup.name, group.id]);
+				this.logger.log(`Synced group name: ${group.phone} -> ${evoGroup.name}`);
+				updated++;
+			}
+		}
+
+		return { updated, total: groupsList.length };
+	}
+
 	async getContacts(userId: number) {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
@@ -505,19 +543,34 @@ export class CrmService implements OnModuleInit {
 				if (group) contactName = group.name;
 			} catch {}
 		}
+
+		// Track if we have a real group name (not just the phone fallback)
+		const hasRealGroupName = isGroup && !!contactName;
 		if (isGroup && !contactName) contactName = phone;
 
 		if (isGroup) {
-			// Groups: unique per (user_id, phone, instance_id) - each instance has its own groups
-			await pool.query(
-				`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
-				 VALUES (?, ?, ?, 1, ?, NULL, NOW())
-				 ON DUPLICATE KEY UPDATE
-				   name = COALESCE(VALUES(name), name),
-				   last_message_at = NOW(),
-				   updated_at = NOW()`,
-				[userId, instanceId, phone, contactName],
-			);
+			if (hasRealGroupName) {
+				// We have a real group name - always update it
+				await pool.query(
+					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
+					 VALUES (?, ?, ?, 1, ?, NULL, NOW())
+					 ON DUPLICATE KEY UPDATE
+					   name = VALUES(name),
+					   last_message_at = NOW(),
+					   updated_at = NOW()`,
+					[userId, instanceId, phone, contactName],
+				);
+			} else {
+				// No real name - only set name on first insert, don't overwrite existing
+				await pool.query(
+					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
+					 VALUES (?, ?, ?, 1, ?, NULL, NOW())
+					 ON DUPLICATE KEY UPDATE
+					   last_message_at = NOW(),
+					   updated_at = NOW()`,
+					[userId, instanceId, phone, contactName],
+				);
+			}
 		} else {
 			// Individual contacts: check if already exists for this user (any instance)
 			const [existing] = await pool.query(

@@ -137,6 +137,14 @@ export default function Conversations() {
         return tb - ta;
       });
       setContacts(list);
+
+      // Sync group names in background - fix groups showing phone numbers
+      const hasGroupsWithPhoneName = list.some((c) => c.is_group && (c.name === c.phone || !c.name));
+      if (hasGroupsWithPhoneName) {
+        authFetch("/api/crm/sync-group-names", { method: "POST" })
+          .then(() => load())
+          .catch(() => {});
+      }
     } catch {
       toast.error("Erro ao carregar conversas");
     } finally {

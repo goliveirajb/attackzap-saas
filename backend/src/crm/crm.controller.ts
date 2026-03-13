@@ -125,6 +125,12 @@ export class CrmController {
 		return this.svc.togglePin(req.user.id, Number(id), body.pinned);
 	}
 
+	@Post("sync-group-names")
+	@UseGuards(JwtAuthGuard)
+	async syncGroupNames(@Req() req) {
+		return this.svc.syncGroupNames(req.user.id);
+	}
+
 	// ==================== MESSAGES ====================
 
 	@Get("contacts/:id/messages")
