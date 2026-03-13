@@ -152,7 +152,7 @@ export default function Layout() {
         transform transition-transform duration-200
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        <div className="p-5 border-b border-dark-border flex items-center justify-between">
+        <div className="p-5 border-b border-dark-border flex items-center justify-between" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
           <div>
             <h1 className="text-xl font-extrabold text-primary tracking-wider">ATTACKZAP</h1>
             <p className="text-xs text-gray-400 mt-0.5">CRM WhatsApp</p>
@@ -208,7 +208,7 @@ export default function Layout() {
       {/* Content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Mobile header */}
-        <header id="mobile-header" className="md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border flex-shrink-0">
+        <header id="mobile-header" className="md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border flex-shrink-0" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
           <button onClick={() => setSidebarOpen(true)} className="text-gray-400 hover:text-white">
             <FaBars size={20} />
           </button>

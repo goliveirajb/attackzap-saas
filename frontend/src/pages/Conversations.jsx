@@ -1062,32 +1062,37 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     <>
       {/* Header */}
       <div className="flex items-center justify-between px-3 md:px-5 py-2 bg-[#202c33] border-b border-[#2a3942]" style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}>
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1 flex-shrink-0">
             <FaArrowLeft size={14} />
           </button>
-          <div className="flex-shrink-0">
-            <ContactAvatar contact={contact} size={10} textSize="text-sm" authFetch={authFetch} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
-              {!!contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
-              {contact.name || contact.phone}
-            </p>
-            <p className="text-[10px] text-gray-500 flex items-center gap-1 truncate">
-              <FaWhatsapp size={9} className="text-green-400 flex-shrink-0" />
-              {contact.phone}
-              {contact.stage_name && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[8px] font-medium"
-                  style={{ backgroundColor: (contact.stage_color || "#666") + "20", color: contact.stage_color }}>
-                  {contact.stage_name}
-                </span>
-              )}
-            </p>
+          <div
+            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition"
+            onClick={() => { setShowInfo(true); setEditing(false); }}
+          >
+            <div className="flex-shrink-0">
+              <ContactAvatar contact={contact} size={10} textSize="text-sm" authFetch={authFetch} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
+                {!!contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
+                {contact.name || contact.phone}
+              </p>
+              <p className="text-[10px] text-gray-500 flex items-center gap-1 truncate">
+                <FaWhatsapp size={9} className="text-green-400 flex-shrink-0" />
+                {contact.phone}
+                {contact.stage_name && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[8px] font-medium"
+                    style={{ backgroundColor: (contact.stage_color || "#666") + "20", color: contact.stage_color }}>
+                    {contact.stage_name}
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
         <button onClick={() => { setShowInfo(!showInfo); setEditing(false); }}
-          className={`p-2 rounded-lg transition ${showInfo ? "bg-primary/10 text-primary" : "text-gray-400 hover:text-white"}`}>
+          className={`p-2 rounded-lg transition flex-shrink-0 ${showInfo ? "bg-primary/10 text-primary" : "text-gray-400 hover:text-white"}`}>
           <FaEllipsisV size={14} />
         </button>
       </div>
@@ -1323,7 +1328,14 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
 
         {/* ---- Contact Info / Edit Sidebar ---- */}
         {showInfo && (
-          <div className="w-full md:w-80 flex flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
+          <div className="fixed inset-0 z-50 md:static md:z-auto w-full md:w-80 flex flex-col bg-dark-card border-l border-dark-border overflow-y-auto">
+            {/* Profile header with back button */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-[#202c33] border-b border-[#2a3942]" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+              <button onClick={() => setShowInfo(false)} className="text-gray-400 hover:text-white transition">
+                <FaArrowLeft size={14} />
+              </button>
+              <p className="text-sm font-semibold text-white">{editing ? "Editar contato" : "Dados do contato"}</p>
+            </div>
             {/* Avatar + basic info */}
             <div className="flex flex-col items-center py-5 border-b border-dark-border">
               <div className="mb-2">
