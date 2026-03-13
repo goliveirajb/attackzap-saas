@@ -599,20 +599,21 @@ export class CrmService implements OnModuleInit {
 			const existingContact = (existing as any[])[0];
 
 			if (existingContact) {
+				// Update push_name (WhatsApp display name) but don't touch user-set name
 				await pool.query(
 					`UPDATE contacts SET
-					   name = COALESCE(?, name),
+					   push_name = COALESCE(?, push_name),
 					   last_message_at = NOW(),
 					   updated_at = NOW()
 					 WHERE id = ?`,
-					[contactName, existingContact.id],
+					[pushName || null, existingContact.id],
 				);
 			} else {
-				// Create new contact for this instance
+				// Create new contact - name stays NULL, push_name stores WhatsApp name
 				await pool.query(
-					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
-					 VALUES (?, ?, ?, 0, ?, ?, NOW())`,
-					[userId, instanceId, phone, contactName, firstStage?.id || null],
+					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, push_name, stage_id, last_message_at)
+					 VALUES (?, ?, ?, 0, NULL, ?, ?, NOW())`,
+					[userId, instanceId, phone, pushName || null, firstStage?.id || null],
 				);
 			}
 		}

@@ -215,6 +215,11 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN archived TINYINT(1) DEFAULT 0 AFTER pinned
 		`).catch(() => {});
 
+		// Add push_name column to store WhatsApp display name separately
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN push_name VARCHAR(255) DEFAULT NULL AFTER name
+		`).catch(() => {});
+
 		// One-time migration: clear auto-set pushName from non-group contacts
 		// After this, names are only set when user manually saves the contact
 		await pool.query(`

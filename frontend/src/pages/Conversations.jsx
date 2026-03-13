@@ -686,7 +686,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   const pollRef = useRef(null);
 
   // Edit form
-  const [editName, setEditName] = useState(contact.name || "");
+  const [editName, setEditName] = useState(contact.name || contact.push_name || "");
   const [editPhone, setEditPhone] = useState(contact.phone || "");
   const [editEmail, setEditEmail] = useState(contact.email || "");
   const [editTags, setEditTags] = useState(contact.tags || "");
