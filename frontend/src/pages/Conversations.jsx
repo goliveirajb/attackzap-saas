@@ -473,7 +473,7 @@ export default function Conversations() {
                         {c.name ? c.phone : "Toque para abrir"}
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                        {c.pinned && <FaThumbtack size={10} className="text-gray-500" />}
+                        {!!c.pinned && <FaThumbtack size={10} className="text-gray-500" />}
                         {c.stage_name && (
                           <span className="text-[8px] px-1.5 py-0.5 rounded-full font-medium"
                             style={{ backgroundColor: (c.stage_color || "#666") + "20", color: c.stage_color }}>
