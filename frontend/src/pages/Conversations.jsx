@@ -935,7 +935,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white truncate flex items-center gap-1.5">
-              {contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
+              {!!contact.is_group && <FaUsers size={10} className="text-green-400 flex-shrink-0" />}
               {contact.name || contact.phone}
             </p>
             <p className="text-[10px] text-gray-500 flex items-center gap-1 truncate">
