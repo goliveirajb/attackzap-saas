@@ -6,7 +6,7 @@ import {
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
   FaSmile, FaPaperclip, FaTrash,
-  FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack,
+  FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack, FaArchive,
 } from "react-icons/fa";
 
 const EMOJI_LIST = [
@@ -122,6 +122,7 @@ export default function Conversations() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState(null); // null = all, stage_id, "none", or "groups"
   const [instanceFilter, setInstanceFilter] = useState(null); // null = all, instance_id
+  const [showArchived, setShowArchived] = useState(false);
   const [activeChat, setActiveChat] = useState(null);
   const activeChatRef = useRef(null);
   const [dropdownId, setDropdownId] = useState(null);
@@ -237,11 +238,25 @@ export default function Conversations() {
     return Array.from(map.values());
   }, [contacts]);
 
+  // Count archived per instance
+  const archivedCount = useMemo(() => {
+    if (instanceFilter !== null) {
+      return contacts.filter((c) => c.archived && c.instance_id === instanceFilter).length;
+    }
+    return contacts.filter((c) => c.archived).length;
+  }, [contacts, instanceFilter]);
+
   const filtered = useMemo(() => {
     let list = contacts;
     // Instance filter
     if (instanceFilter !== null) {
       list = list.filter((c) => c.instance_id === instanceFilter);
+    }
+    // Archived filter
+    if (showArchived) {
+      list = list.filter((c) => c.archived);
+    } else {
+      list = list.filter((c) => !c.archived);
     }
     // Stage filter
     if (stageFilter === "groups") {
@@ -268,7 +283,7 @@ export default function Conversations() {
       return tb - ta;
     });
     return list;
-  }, [contacts, search, stageFilter, instanceFilter]);
+  }, [contacts, search, stageFilter, instanceFilter, showArchived]);
 
   const openChat = (c) => {
     setActiveChat(c);
@@ -276,8 +291,27 @@ export default function Conversations() {
     if (Number(c.unread_count) > 0) {
       setContacts((prev) => prev.map((ct) => ct.id === c.id ? { ...ct, unread_count: 0 } : ct));
     }
+    // Push history state so native back button closes chat
+    window.history.pushState({ chatOpen: true }, "");
   };
-  const closeChat = () => { setActiveChat(null); activeChatRef.current = null; load(); };
+  const closeChat = useCallback(() => {
+    setActiveChat(null);
+    activeChatRef.current = null;
+    load();
+  }, []);
+
+  // Handle browser/mobile back button
+  useEffect(() => {
+    const onPopState = (e) => {
+      if (activeChatRef.current) {
+        setActiveChat(null);
+        activeChatRef.current = null;
+        load();
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const togglePin = async (contactId, currentPinned) => {
     const pinned = !currentPinned;
@@ -290,6 +324,20 @@ export default function Conversations() {
       });
     } catch {
       setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, pinned: currentPinned } : c));
+    }
+  };
+
+  const toggleArchive = async (contactId, currentArchived) => {
+    const archived = !currentArchived;
+    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, archived } : c));
+    setDropdownId(null);
+    try {
+      await authFetch(`/api/crm/contacts/${contactId}/archive`, {
+        method: "PUT",
+        body: JSON.stringify({ archived }),
+      });
+    } catch {
+      setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, archived: currentArchived } : c));
     }
   };
 
@@ -433,6 +481,27 @@ export default function Conversations() {
 
         {/* Contact list */}
         <div className="flex-1 overflow-y-auto">
+          {/* Archived toggle */}
+          {!showArchived && archivedCount > 0 && (
+            <button
+              onClick={() => setShowArchived(true)}
+              className="w-full flex items-center gap-3 px-5 py-3 text-sm text-gray-400 hover:bg-dark-cardSoft transition border-b border-dark-border"
+            >
+              <FaArchive size={14} className="text-green-500" />
+              <span>Arquivadas</span>
+              <span className="ml-auto text-xs bg-dark-cardSoft px-2 py-0.5 rounded-full text-gray-500">{archivedCount}</span>
+            </button>
+          )}
+          {showArchived && (
+            <button
+              onClick={() => setShowArchived(false)}
+              className="w-full flex items-center gap-3 px-5 py-3 text-sm text-green-400 bg-green-500/10 hover:bg-green-500/15 transition border-b border-dark-border"
+            >
+              <FaArrowLeft size={12} />
+              <span>Voltar das arquivadas</span>
+              <span className="ml-auto text-xs text-gray-500">{filtered.length}</span>
+            </button>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <FaSpinner className="animate-spin text-primary mr-2" />
@@ -522,6 +591,13 @@ export default function Conversations() {
                       >
                         <FaThumbtack size={12} className={c.pinned ? "text-primary" : ""} />
                         {c.pinned ? "Desafixar conversa" : "Fixar conversa"}
+                      </button>
+                      <button
+                        onClick={() => toggleArchive(c.id, c.archived)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-dark-cardSoft transition"
+                      >
+                        <FaArchive size={12} className={c.archived ? "text-green-400" : ""} />
+                        {c.archived ? "Desarquivar conversa" : "Arquivar conversa"}
                       </button>
                     </div>
                   )}

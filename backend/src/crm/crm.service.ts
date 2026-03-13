@@ -275,6 +275,15 @@ export class CrmService implements OnModuleInit {
 		return { ok: true, pinned };
 	}
 
+	async toggleArchive(userId: number, contactId: number, archived: boolean) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE contacts SET archived = ? WHERE id = ? AND user_id = ?`,
+			[archived ? 1 : 0, contactId, userId],
+		);
+		return { ok: true, archived };
+	}
+
 	// ==================== MESSAGES ====================
 
 	async getMessages(contactId: number, limit = 50) {

@@ -125,6 +125,12 @@ export class CrmController {
 		return this.svc.togglePin(req.user.id, Number(id), body.pinned);
 	}
 
+	@Put("contacts/:id/archive")
+	@UseGuards(JwtAuthGuard)
+	async toggleArchive(@Req() req, @Param("id") id: string, @Body() body: { archived: boolean }) {
+		return this.svc.toggleArchive(req.user.id, Number(id), body.archived);
+	}
+
 	@Post("sync-group-names")
 	@UseGuards(JwtAuthGuard)
 	async syncGroupNames(@Req() req) {

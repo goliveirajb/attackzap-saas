@@ -65,10 +65,8 @@ const getMenuSections = (role) => {
 const getBottomNavItems = () => {
   const items = [
     { to: "/app/conversations", label: "Conversas", icon: FaComments },
-    { to: "/app", label: "Inicio", icon: FaHome },
     { to: "/app/crm", label: "Contatos", icon: FaUsers },
-    { to: "/app/instances", label: "Conexoes", icon: FaWhatsapp },
-    { to: "/app/settings", label: "Config", icon: FaCog },
+    { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
   ];
   return items;
 };

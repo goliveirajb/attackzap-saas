@@ -209,6 +209,11 @@ export class DatabaseService implements OnModuleInit {
 			ALTER TABLE contacts ADD COLUMN pinned TINYINT(1) DEFAULT 0 AFTER last_read_at
 		`).catch(() => {});
 
+		// Add archived column to contacts
+		await pool.query(`
+			ALTER TABLE contacts ADD COLUMN archived TINYINT(1) DEFAULT 0 AFTER pinned
+		`).catch(() => {});
+
 		// Quick replies table
 		await pool.query(`
 			CREATE TABLE IF NOT EXISTS quick_replies (
