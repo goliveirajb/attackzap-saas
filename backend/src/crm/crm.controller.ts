@@ -24,6 +24,12 @@ export class CrmController {
 		return this.svc.createStage(req.user.id, body.name, body.color || "#0a6fbe");
 	}
 
+	@Put("stages/reorder")
+	@UseGuards(JwtAuthGuard)
+	async reorderStages(@Req() req, @Body() body: { stageIds: number[] }) {
+		return this.svc.reorderStages(req.user.id, body.stageIds);
+	}
+
 	@Put("stages/:id")
 	@UseGuards(JwtAuthGuard)
 	async updateStage(@Param("id") id: string, @Body() body: { name?: string; color?: string; position?: number }) {

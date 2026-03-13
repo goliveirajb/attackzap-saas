@@ -84,6 +84,17 @@ export class CrmService implements OnModuleInit {
 		await pool.query(`UPDATE crm_stages SET ${fields.join(", ")} WHERE id = ?`, values);
 	}
 
+	async reorderStages(userId: number, stageIds: number[]) {
+		const pool = this.db.getPool();
+		for (let i = 0; i < stageIds.length; i++) {
+			await pool.query(
+				`UPDATE crm_stages SET position = ? WHERE id = ? AND user_id = ?`,
+				[i, stageIds[i], userId],
+			);
+		}
+		return { ok: true };
+	}
+
 	async deleteStage(id: number) {
 		const pool = this.db.getPool();
 		// Move contacts from this stage to null

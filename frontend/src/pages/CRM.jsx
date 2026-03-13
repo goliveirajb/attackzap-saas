@@ -36,9 +36,13 @@ export default function CRM() {
   const [stageName, setStageName] = useState("");
   const [stageColor, setStageColor] = useState("#0a6fbe");
 
-  // Drag & Drop
+  // Drag & Drop contacts
   const [draggedContact, setDraggedContact] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
+
+  // Drag & Drop stages (reorder columns)
+  const [draggedStage, setDraggedStage] = useState(null);
+  const [dragOverStageCol, setDragOverStageCol] = useState(null);
 
   const load = async () => {
     try {
@@ -189,6 +193,53 @@ export default function CRM() {
     }
   };
 
+  // ---- STAGE DRAG & DROP (reorder columns) ----
+  const handleStageDragStart = (e, stage) => {
+    setDraggedStage(stage);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/stage", stage.id);
+  };
+
+  const handleStageDragOver = (e, stageId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedStage || draggedStage.id === stageId) return;
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStageCol(stageId);
+  };
+
+  const handleStageDrop = async (e, targetStageId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverStageCol(null);
+    if (!draggedStage || draggedStage.id === targetStageId) {
+      setDraggedStage(null);
+      return;
+    }
+    // Reorder: move draggedStage to target position
+    const oldIndex = stages.findIndex((s) => s.id === draggedStage.id);
+    const newIndex = stages.findIndex((s) => s.id === targetStageId);
+    const reordered = [...stages];
+    reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, stages[oldIndex]);
+    setStages(reordered);
+    setDraggedStage(null);
+    try {
+      await authFetch("/api/crm/stages/reorder", {
+        method: "PUT",
+        body: JSON.stringify({ stageIds: reordered.map((s) => s.id) }),
+      });
+    } catch {
+      toast.error("Erro ao reordenar etapas");
+      load();
+    }
+  };
+
+  const handleStageDragEnd = () => {
+    setDraggedStage(null);
+    setDragOverStageCol(null);
+  };
+
   // ---- STAGES ----
   const handleCreateStage = async () => {
     if (!stageName.trim()) return toast.error("Nome obrigatorio");
@@ -302,15 +353,28 @@ export default function CRM() {
             {stages.map((stage) => {
               const stageContacts = contactsByStage[stage.id] || [];
               const isDragOver = dragOverStage === stage.id;
+              const isStageOver = dragOverStageCol === stage.id;
+              const isStageDragging = draggedStage?.id === stage.id;
               return (
-                <div key={stage.id} className="flex-shrink-0 w-[240px] md:w-[280px] flex flex-col">
-                  {/* Stage header */}
-                  <div className="flex items-center justify-between px-3 py-2.5 rounded-t-xl border border-b-0"
+                <div key={stage.id} className={`flex-shrink-0 w-[240px] md:w-[280px] flex flex-col transition-all duration-200 ${
+                  isStageDragging ? "opacity-40 scale-95" : ""
+                } ${isStageOver ? "transform -translate-y-1" : ""}`}>
+                  {/* Stage header - draggable for reorder */}
+                  <div
+                    draggable
+                    onDragStart={(e) => handleStageDragStart(e, stage)}
+                    onDragOver={(e) => handleStageDragOver(e, stage.id)}
+                    onDrop={(e) => handleStageDrop(e, stage.id)}
+                    onDragEnd={handleStageDragEnd}
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-t-xl border border-b-0 cursor-grab active:cursor-grabbing transition-all ${
+                      isStageOver ? "ring-2 ring-primary ring-offset-1 ring-offset-dark-body" : ""
+                    }`}
                     style={{
                       backgroundColor: stage.color + "12",
-                      borderColor: stage.color + "40",
+                      borderColor: isStageOver ? "var(--color-primary, #0a6fbe)" : stage.color + "40",
                     }}>
                     <div className="flex items-center gap-2">
+                      <FaGripVertical className="text-gray-600 flex-shrink-0 hover:text-gray-400 transition" size={10} />
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
                       <span className="text-sm font-semibold text-white">{stage.name}</span>
                       <span className="text-[10px] text-gray-500 bg-dark-card/80 px-1.5 py-0.5 rounded-full ml-1">
