@@ -548,9 +548,10 @@ export class CrmService implements OnModuleInit {
 		const firstStage = (stages as any[])[0];
 
 		// For groups, extract group name from metadata or fetch from Evolution API
+		// For individuals, don't auto-set name from pushName - only show phone until user saves a name
 		let contactName: string | null = isGroup
 			? (payload?.data?.groupMetadata?.subject || data?.groupMetadata?.subject || data?.groupJid?.subject || null)
-			: pushName;
+			: null;
 
 		// If group name not in webhook, try fetching from Evolution API
 		if (isGroup && !contactName && instanceName) {
