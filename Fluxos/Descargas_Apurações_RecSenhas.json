@@ -1,0 +1,275 @@
+{
+  "name": "Descargas/Apurações/RecSenhas",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL || 'http://localhost:8084' }}/message/sendMedia/AUTOBOT",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"mediatype\": \"document\",\n  \"mimetype\": \"{{ $json.mimetype || 'application/pdf' }}\",\n  \"media\": \"{{ $json.media.replace(/^data:[^,]+,/, '').replace(/\\\\s/g, '') }}\",\n  \"caption\": \"{{ $json.caption || '' }}\",\n  \"fileName\": \"{{ $json.fileName || 'documento.pdf' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        288
+      ],
+      "id": "b36a423a-d0ee-44e6-b36f-690111e4e3c5",
+      "name": "Enviar documento HTTP",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "dha86BZYO0fZLdUj",
+          "name": "AUTOBOT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "814fa559-b907-42d5-9097-f63bd13b2983",
+              "leftValue": "={{ ( $json.media || $json.fileBase64 || $json.fileUrl || '' ).toString().trim() }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "386db200-c4d5-4731-bc18-f45ee07c2650",
+              "leftValue": "={{ ($json.fileName || '').toString().trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        352
+      ],
+      "id": "622b8c2f-964f-4437-a165-fa341d73bb7d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "AUTOBOT",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        352
+      ],
+      "id": "b7d9c13c-7963-4742-a070-d6318a9d3935",
+      "name": "Webhook1",
+      "webhookId": "ef3a57e3-a61f-41f8-a831-85bed488a1c4",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "dha86BZYO0fZLdUj",
+          "name": "AUTOBOT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f6ad145f-36de-44e1-93f2-0cfd68dacdfb",
+              "name": "number",
+              "value": "={{ $json[\"body\"][\"number\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "d0047d35-9d3e-4027-879c-684adc9da87c",
+              "name": "mediatype",
+              "value": "={{ $json[\"body\"][\"mediatype\"] || 'document' }}",
+              "type": "string"
+            },
+            {
+              "id": "2607f5d0-0b2f-4639-a61a-85c46e5f93c9",
+              "name": "mimetype",
+              "value": "={{ $json[\"body\"][\"mimetype\"] || 'application/pdf' }}",
+              "type": "string"
+            },
+            {
+              "id": "df5b1aac-317b-42fa-89d8-7e8c9435b9a4",
+              "name": "fileName",
+              "value": "={{ $json[\"body\"][\"fileName\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "5e5fcc53-e366-4a11-bc25-34f4b5557d20",
+              "name": "caption",
+              "value": "={{ $json[\"body\"][\"caption\"] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d07b25b7-5ec3-49c4-ba48-045c5f20b66a",
+              "name": "media",
+              "value": "={{ $json[\"body\"][\"media\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "0db4a2aa-880d-45f0-b52b-eeb713243551",
+              "name": "text",
+              "value": "={{ $json[\"body\"][\"text\"] || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -384,
+        352
+      ],
+      "id": "86c2cb5a-4578-4b35-81c0-089614780135",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"message\":\"sucesso\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        352
+      ],
+      "id": "447802b0-685a-4b05-9b0f-bd7c8a0a7f1c",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL || 'http://localhost:8084' }}/message/sendText/AUTOBOT",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"text\": \"{{ $json.text }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        464
+      ],
+      "id": "bd3c1529-188c-49f1-ace1-a1383130a861",
+      "name": "Enviar texto HTTP",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "dha86BZYO0fZLdUj",
+          "name": "AUTOBOT"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Enviar documento HTTP": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Enviar documento HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar texto HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto HTTP": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bc9934cb-9c40-41b1-b1e5-fc9f5683b04b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68e5f56b1f4b624b7a9f7e6b2c2e71543b3bfa26a570d41061a6b8506afa9aea"
+  },
+  "id": "nmKfNhdjnXKPZihs",
+  "tags": []
+}
