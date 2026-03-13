@@ -572,26 +572,25 @@ export class CrmService implements OnModuleInit {
 				);
 			}
 		} else {
-			// Individual contacts: check if already exists for this user (any instance)
+			// Individual contacts: unique per (user_id, phone, instance_id)
+			// Same person on different instances = separate contacts
 			const [existing] = await pool.query(
-				`SELECT id, instance_id FROM contacts WHERE user_id = ? AND phone = ? AND is_group = 0 LIMIT 1`,
-				[userId, phone],
+				`SELECT id FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ? AND is_group = 0 LIMIT 1`,
+				[userId, phone, instanceId],
 			);
 			const existingContact = (existing as any[])[0];
 
 			if (existingContact) {
-				// Update existing contact - keep original instance_id unless null
 				await pool.query(
 					`UPDATE contacts SET
-					   instance_id = COALESCE(instance_id, ?),
-					   name = COALESCE(name, ?),
+					   name = COALESCE(?, name),
 					   last_message_at = NOW(),
 					   updated_at = NOW()
 					 WHERE id = ?`,
-					[instanceId, contactName, existingContact.id],
+					[contactName, existingContact.id],
 				);
 			} else {
-				// Create new contact
+				// Create new contact for this instance
 				await pool.query(
 					`INSERT INTO contacts (user_id, instance_id, phone, is_group, name, stage_id, last_message_at)
 					 VALUES (?, ?, ?, 0, ?, ?, NOW())`,
@@ -600,13 +599,12 @@ export class CrmService implements OnModuleInit {
 			}
 		}
 
-		// Get contact ID
-		const contactQuery = isGroup
-			? `SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ? AND is_group = 1`
-			: `SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND is_group = 0 LIMIT 1`;
-		const contactParams = isGroup ? [userId, phone, instanceId] : [userId, phone];
-		const [contacts] = await pool.query(contactQuery, contactParams);
-		const contact = (contacts as any[])[0];
+		// Get contact ID - always filter by instance
+		const [foundContacts] = await pool.query(
+			`SELECT id, profile_pic_url FROM contacts WHERE user_id = ? AND phone = ? AND instance_id = ? AND is_group = ? LIMIT 1`,
+			[userId, phone, instanceId, isGroup ? 1 : 0],
+		);
+		const contact = (foundContacts as any[])[0];
 		if (!contact) return { ignored: true };
 
 		// Fetch profile pic in background if not yet stored

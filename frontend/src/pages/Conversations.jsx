@@ -474,6 +474,7 @@ export default function Conversations() {
                     <div className="flex items-center justify-between">
                       <p className={`text-[17px] leading-tight truncate ${unread > 0 ? "font-medium text-white" : "font-normal text-white"}`}>
                         {c.name || c.phone}
+                        {c.instance_name && <span className="text-[10px] text-gray-500 ml-1.5 font-normal">({c.instance_name})</span>}
                       </p>
                       {formatChatDate(c.last_message_at) && (
                         <span className={`text-[13px] flex-shrink-0 ml-2 ${
