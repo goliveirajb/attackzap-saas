@@ -928,13 +928,14 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           reader.readAsDataURL(blob);
         });
 
-        // Send audio
+        // Send audio - strip data URL prefix, Evolution expects raw base64
         setUploadingMedia(true);
         const toastId = toast.loading("Enviando audio...");
         try {
+          const cleanBase64 = base64.replace(/^data:[^,]+,/, "");
           const res = await authFetch(`/api/crm/contacts/${contact.id}/send-media`, {
             method: "POST",
-            body: JSON.stringify({ base64, caption: "", mediaType: "audio" }),
+            body: JSON.stringify({ base64: cleanBase64, caption: "", mediaType: "audio" }),
           });
           toast.dismiss(toastId);
           if (!res.ok) throw new Error();
@@ -1030,7 +1031,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 md:px-5 py-2 bg-[#202c33] border-b border-[#2a3942]">
+      <div className="flex items-center justify-between px-3 md:px-5 py-2 bg-[#202c33] border-b border-[#2a3942]" style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="text-gray-400 hover:text-white transition md:mr-1">
             <FaArrowLeft size={14} />
@@ -1209,7 +1210,7 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           )}
 
           {/* Input */}
-          <div className="px-3 md:px-6 lg:px-12 py-2 bg-[#202c33]">
+          <div className="px-3 md:px-6 lg:px-12 py-2 bg-[#202c33]" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-end gap-2 max-w-4xl mx-auto">
               {recording ? (
                 /* Recording mode */

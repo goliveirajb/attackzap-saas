@@ -15,6 +15,7 @@ export class DatabaseService implements OnModuleInit {
 			database: process.env.DB_DATABASE || "attackzap_saas",
 			waitForConnections: true,
 			connectionLimit: 10,
+			timezone: "-03:00",
 		});
 
 		try {

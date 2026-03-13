@@ -387,20 +387,24 @@ export class CrmService implements OnModuleInit {
 		if (!contact) throw new Error("Contato nao encontrado");
 		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
 
+		// Use correct JID format: groups use @g.us, individuals use phone number
+		const jid = contact.is_group ? `${contact.phone}@g.us` : contact.phone;
+
 		// Send via Evolution
-		await this.whatsapp.sendText(contact.instance_name, contact.phone, text);
+		await this.whatsapp.sendText(contact.instance_name, jid, text);
 
 		// Save to DB
+		const remoteJid = contact.is_group ? `${contact.phone}@g.us` : `${contact.phone}@s.whatsapp.net`;
 		await pool.query(
 			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name)
 			 VALUES (?, ?, 'outgoing', ?, 'text', ?, ?)`,
-			[contactId, userId, text, `${contact.phone}@s.whatsapp.net`, contact.instance_name],
+			[contactId, userId, text, remoteJid, contact.instance_name],
 		);
 
 		// Update last_message_at
 		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
 
-		this.logger.log(`Message sent to ${contact.phone} via ${contact.instance_name}`);
+		this.logger.log(`Message sent to ${jid} via ${contact.instance_name}`);
 		return { ok: true };
 	}
 
@@ -418,17 +422,21 @@ export class CrmService implements OnModuleInit {
 		if (!contact) throw new Error("Contato nao encontrado");
 		if (!contact.instance_name) throw new Error("Contato sem instancia vinculada");
 
-		this.logger.log(`Sending ${mediaType} to ${contact.phone} via ${contact.instance_name} (base64 size: ${Math.round(base64.length / 1024)}KB)`);
+		// Use correct JID format for groups
+		const jid = contact.is_group ? `${contact.phone}@g.us` : contact.phone;
+		const remoteJid = contact.is_group ? `${contact.phone}@g.us` : `${contact.phone}@s.whatsapp.net`;
+
+		this.logger.log(`Sending ${mediaType} to ${jid} via ${contact.instance_name} (base64 size: ${Math.round(base64.length / 1024)}KB)`);
 
 		// Send via Evolution
-		await this.whatsapp.sendMedia(contact.instance_name, contact.phone, base64, caption, mediaType);
+		await this.whatsapp.sendMedia(contact.instance_name, jid, base64, caption, mediaType);
 
 		// Save to DB (store base64 in raw_data so we can display it later)
 		try {
 			await pool.query(
 				`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
 				 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
-				[contactId, userId, caption || `[${mediaType}]`, mediaType, `${contact.phone}@s.whatsapp.net`, contact.instance_name, JSON.stringify({ media_base64: base64 })],
+				[contactId, userId, caption || `[${mediaType}]`, mediaType, remoteJid, contact.instance_name, JSON.stringify({ media_base64: base64 })],
 			);
 		} catch (dbErr) {
 			// If DB save fails (e.g., packet too large), still consider success since Evolution sent it
@@ -437,7 +445,7 @@ export class CrmService implements OnModuleInit {
 
 		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
 
-		this.logger.log(`Media sent to ${contact.phone} via ${contact.instance_name}`);
+		this.logger.log(`Media sent to ${jid} via ${contact.instance_name}`);
 		return { ok: true };
 	}
 

@@ -189,6 +189,9 @@ export class WhatsappService {
 			return this.sendAudio(instanceName, number, mediaBase64);
 		}
 
+		// Strip data URL prefix if present
+		const cleanMedia = mediaBase64.replace(/^data:[^,]+,/, "");
+
 		const res = await fetch(
 			`${this.evolutionUrl}/message/sendMedia/${instanceName}`,
 			{
@@ -200,7 +203,7 @@ export class WhatsappService {
 				body: JSON.stringify({
 					number,
 					mediatype,
-					media: mediaBase64,
+					media: cleanMedia,
 					caption,
 				}),
 			},
@@ -216,7 +219,9 @@ export class WhatsappService {
 
 	// Enviar audio como voice note (PTT)
 	async sendAudio(instanceName: string, number: string, audioBase64: string) {
-		this.logger.log(`Sending audio to ${number} via ${instanceName} (size: ${Math.round(audioBase64.length / 1024)}KB)`);
+		// Strip data URL prefix if present
+		const cleanAudio = audioBase64.replace(/^data:[^,]+,/, "");
+		this.logger.log(`Sending audio to ${number} via ${instanceName} (size: ${Math.round(cleanAudio.length / 1024)}KB)`);
 
 		const res = await fetch(
 			`${this.evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`,
@@ -228,7 +233,7 @@ export class WhatsappService {
 				},
 				body: JSON.stringify({
 					number,
-					audio: audioBase64,
+					audio: cleanAudio,
 				}),
 			},
 		);
