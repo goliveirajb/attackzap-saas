@@ -957,15 +957,14 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
           reader.readAsDataURL(blob);
         });
 
-        // Send audio - strip data URL prefix, Evolution expects raw base64
+        // Send audio
         setUploadingMedia(true);
         playSendSound();
         const toastId = toast.loading("Enviando audio...");
         try {
-          const cleanBase64 = base64.replace(/^data:[^,]+,/, "");
           const res = await authFetch(`/api/crm/contacts/${contact.id}/send-media`, {
             method: "POST",
-            body: JSON.stringify({ base64: cleanBase64, caption: "", mediaType: "audio" }),
+            body: JSON.stringify({ base64, caption: "", mediaType: "audio" }),
           });
           toast.dismiss(toastId);
           if (!res.ok) throw new Error();

@@ -219,10 +219,11 @@ export class WhatsappService {
 
 	// Enviar audio como voice note (PTT)
 	async sendAudio(instanceName: string, number: string, audioBase64: string) {
-		// Strip data URL prefix if present
-		const cleanAudio = audioBase64.replace(/^data:[^,]+,/, "");
-		this.logger.log(`Sending audio to ${number} via ${instanceName} (size: ${Math.round(cleanAudio.length / 1024)}KB)`);
+		// Ensure we have the data URI prefix for Evolution API
+		let audioData = audioBase64.replace(/^data:[^,]+,/, "");
+		this.logger.log(`Sending audio to ${number} via ${instanceName} (size: ${Math.round(audioData.length / 1024)}KB)`);
 
+		// Try sendWhatsAppAudio first (voice note / PTT)
 		const res = await fetch(
 			`${this.evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`,
 			{
@@ -233,15 +234,39 @@ export class WhatsappService {
 				},
 				body: JSON.stringify({
 					number,
-					audio: cleanAudio,
+					audio: `data:audio/ogg;base64,${audioData}`,
+					encoding: "base64",
 				}),
 			},
 		);
 
 		if (!res.ok) {
 			const errText = await res.text().catch(() => "");
-			this.logger.error(`sendAudio error (${res.status}): ${errText}`);
-			throw new Error(`Falha ao enviar audio: ${res.status}`);
+			this.logger.warn(`sendWhatsAppAudio failed (${res.status}): ${errText}, trying sendMedia fallback`);
+
+			// Fallback: send as regular media audio
+			const res2 = await fetch(
+				`${this.evolutionUrl}/message/sendMedia/${instanceName}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						apikey: this.evolutionKey,
+					},
+					body: JSON.stringify({
+						number,
+						mediatype: "audio",
+						media: `data:audio/ogg;base64,${audioData}`,
+					}),
+				},
+			);
+
+			if (!res2.ok) {
+				const errText2 = await res2.text().catch(() => "");
+				this.logger.error(`sendMedia audio fallback error (${res2.status}): ${errText2}`);
+				throw new Error(`Falha ao enviar audio: ${res2.status}`);
+			}
+			return await res2.json();
 		}
 		return await res.json();
 	}
