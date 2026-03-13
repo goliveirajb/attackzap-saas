@@ -139,75 +139,64 @@ function urlBase64ToUint8Array(base64String) {
 
 // ==================== NOTIFICATION SOUND ====================
 
-// Generate a WAV notification sound (WhatsApp-style two-tone chime)
-function generateNotificationWav() {
-  const sampleRate = 44100;
-  const duration = 0.6;
-  const samples = Math.floor(sampleRate * duration);
-  const buffer = new ArrayBuffer(44 + samples * 2);
-  const view = new DataView(buffer);
+// Single reusable Audio element - more reliable than creating new ones each time
+let _notifAudio = null;
+let _audioUnlocked = false;
 
-  // WAV header
-  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
-  writeStr(0, "RIFF");
-  view.setUint32(4, 36 + samples * 2, true);
-  writeStr(8, "WAVE");
-  writeStr(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeStr(36, "data");
-  view.setUint32(40, samples * 2, true);
-
-  // Two-tone chime: first note then higher note with smooth envelope
-  for (let i = 0; i < samples; i++) {
-    const t = i / sampleRate;
-    let sample = 0;
-
-    // First tone: 0-0.15s at 523Hz (C5)
-    if (t < 0.2) {
-      const env = t < 0.01 ? t / 0.01 : Math.exp(-(t - 0.01) * 6);
-      sample += Math.sin(2 * Math.PI * 523 * t) * env * 0.5;
+function getNotifAudio() {
+  if (!_notifAudio) {
+    // Generate WAV inline
+    const sampleRate = 44100;
+    const duration = 0.6;
+    const samples = Math.floor(sampleRate * duration);
+    const buffer = new ArrayBuffer(44 + samples * 2);
+    const view = new DataView(buffer);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, "RIFF"); view.setUint32(4, 36 + samples * 2, true); w(8, "WAVE"); w(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    w(36, "data"); view.setUint32(40, samples * 2, true);
+    for (let i = 0; i < samples; i++) {
+      const t = i / sampleRate;
+      let s = 0;
+      if (t < 0.2) { const e = t < 0.01 ? t / 0.01 : Math.exp(-(t - 0.01) * 6); s += Math.sin(2 * Math.PI * 523 * t) * e * 0.5; s += Math.sin(2 * Math.PI * 1046 * t) * Math.exp(-t * 12) * 0.15; }
+      if (t > 0.15 && t < 0.55) { const e = (t - 0.15) < 0.01 ? (t - 0.15) / 0.01 : Math.exp(-((t - 0.15) - 0.01) * 4); s += Math.sin(2 * Math.PI * 659 * t) * e * 0.5; s += Math.sin(2 * Math.PI * 1318 * (t - 0.15)) * Math.exp(-(t - 0.15) * 10) * 0.15; }
+      view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 32767, true);
     }
-
-    // Second tone: 0.15-0.5s at 659Hz (E5)
-    if (t > 0.15 && t < 0.55) {
-      const t2 = t - 0.15;
-      const env = t2 < 0.01 ? t2 / 0.01 : Math.exp(-(t2 - 0.01) * 4);
-      sample += Math.sin(2 * Math.PI * 659 * t) * env * 0.5;
-    }
-
-    // Soft harmonic for richness
-    if (t < 0.2) {
-      sample += Math.sin(2 * Math.PI * 1046 * t) * Math.exp(-t * 12) * 0.15;
-    }
-    if (t > 0.15 && t < 0.55) {
-      sample += Math.sin(2 * Math.PI * 1318 * (t - 0.15)) * Math.exp(-(t - 0.15) * 10) * 0.15;
-    }
-
-    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 32767, true);
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    _notifAudio = new Audio(URL.createObjectURL(blob));
+    _notifAudio.volume = 1.0;
+    // Preload
+    _notifAudio.load();
   }
-
-  const blob = new Blob([buffer], { type: "audio/wav" });
-  return URL.createObjectURL(blob);
+  return _notifAudio;
 }
 
-// Pre-generate the sound URL once (works in background tabs unlike AudioContext oscillators)
-let _notifSoundUrl = null;
-function getNotifSoundUrl() {
-  if (!_notifSoundUrl) _notifSoundUrl = generateNotificationWav();
-  return _notifSoundUrl;
+// Unlock audio on first user interaction (required by mobile browsers)
+if (typeof window !== "undefined") {
+  const unlock = () => {
+    if (_audioUnlocked) return;
+    const audio = getNotifAudio();
+    // Play silent then pause to unlock
+    audio.volume = 0;
+    const p = audio.play();
+    if (p) p.then(() => { audio.pause(); audio.currentTime = 0; audio.volume = 1.0; _audioUnlocked = true; }).catch(() => {});
+    document.removeEventListener("click", unlock, true);
+    document.removeEventListener("touchstart", unlock, true);
+    document.removeEventListener("touchend", unlock, true);
+  };
+  document.addEventListener("click", unlock, true);
+  document.addEventListener("touchstart", unlock, true);
+  document.addEventListener("touchend", unlock, true);
 }
 
 function playNotificationSound() {
   try {
-    const audio = new Audio(getNotifSoundUrl());
+    const audio = getNotifAudio();
+    audio.currentTime = 0;
     audio.volume = 1.0;
     const p = audio.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p) p.catch(() => {});
   } catch {}
 }
