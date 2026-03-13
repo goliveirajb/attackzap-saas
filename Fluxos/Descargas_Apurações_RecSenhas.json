@@ -4,12 +4,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_API_URL || 'http://localhost:8084' }}/message/sendMedia/AUTOBOT",
+        "url": "https://evo.attackzap.com/message/sendMedia/AUTOBOT",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"mediatype\": \"document\",\n  \"mimetype\": \"{{ $json.mimetype || 'application/pdf' }}\",\n  \"media\": \"{{ $json.media.replace(/^data:[^,]+,/, '').replace(/\\\\s/g, '') }}\",\n  \"caption\": \"{{ $json.caption || '' }}\",\n  \"fileName\": \"{{ $json.fileName || 'documento.pdf' }}\"\n}",
+        "jsonBody": "={\n  \"number\": \"{{ $json.number }}\",\n  \"mediatype\": \"document\",\n  \"mimetype\": \"{{ $json.mimetype }}\",\n  \"media\": \"{{ $json.media }}\",\n  \"caption\": \"{{ $json.caption }}\",\n  \"fileName\": \"{{ $json.fileName }}\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -120,7 +120,7 @@
             {
               "id": "df5b1aac-317b-42fa-89d8-7e8c9435b9a4",
               "name": "fileName",
-              "value": "={{ $json[\"body\"][\"fileName\"] }}",
+              "value": "={{ $json[\"body\"][\"fileName\"] || 'documento.pdf' }}",
               "type": "string"
             },
             {
@@ -132,7 +132,7 @@
             {
               "id": "d07b25b7-5ec3-49c4-ba48-045c5f20b66a",
               "name": "media",
-              "value": "={{ $json[\"body\"][\"media\"] }}",
+              "value": "={{ ($json[\"body\"][\"media\"] || '').replace(/^data:[^,]+,/, '') }}",
               "type": "string"
             },
             {
@@ -172,7 +172,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EVOLUTION_API_URL || 'http://localhost:8084' }}/message/sendText/AUTOBOT",
+        "url": "https://evo.attackzap.com/message/sendText/AUTOBOT",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
