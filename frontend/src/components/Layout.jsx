@@ -64,14 +64,12 @@ const getMenuSections = (role) => {
 };
 
 // Bottom nav items for mobile
-const getBottomNavItems = () => {
-  const items = [
-    { to: "/app/conversations", label: "Conversas", icon: FaComments },
-    { to: "/app/crm", label: "Contatos", icon: FaUsers },
-    { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
-  ];
-  return items;
-};
+const getBottomNavItems = () => [
+  { to: "/app/conversations", label: "Conversas", icon: FaComments },
+  { to: "/app/crm", label: "Contatos", icon: FaUsers },
+  { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
+  { to: "/app/ai", label: "IA", icon: FaBrain },
+];
 
 export default function Layout() {
   const { user, logout, totalUnread, resetUnread } = useAuth();
@@ -112,29 +110,34 @@ export default function Layout() {
         {/* Nav icons */}
         <nav className="flex-1 overflow-y-auto py-4">
           <div className="flex flex-col items-center gap-2 px-2">
-            {allLinks.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.to === "/app"}
-                title={link.label}
-                onClick={link.to === "/app/conversations" ? resetUnread : undefined}
-                className={({ isActive }) =>
-                  `w-12 h-12 flex items-center justify-center rounded-xl transition-all relative ${
-                    isActive
-                      ? "bg-primary text-white shadow-md"
-                      : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
-                  }`
-                }
-              >
-                <link.icon size={22} />
-                {link.to === "/app/conversations" && totalUnread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
-                    {totalUnread > 99 ? "99+" : totalUnread}
-                  </span>
-                )}
-              </NavLink>
-            ))}
+            {allLinks.map((link) => {
+              const hasUnread = link.to === "/app/conversations" && totalUnread > 0;
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.to === "/app"}
+                  title={link.label}
+                  onClick={link.to === "/app/conversations" ? resetUnread : undefined}
+                  className={({ isActive }) =>
+                    `w-12 h-12 flex items-center justify-center rounded-xl transition-all relative ${
+                      isActive
+                        ? "bg-primary text-white shadow-md"
+                        : hasUnread
+                          ? "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
+                    }`
+                  }
+                >
+                  <link.icon size={22} />
+                  {hasUnread && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         </nav>
 
@@ -171,29 +174,34 @@ export default function Layout() {
                 {section.label}
               </p>
               <div className="space-y-0.5">
-                {section.links.map((link) => (
-                  <NavLink
-                    key={link.to}
-                    to={link.to}
-                    end={link.to === "/app"}
-                    onClick={() => { closeSidebar(); if (link.to === "/app/conversations") resetUnread(); }}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                        isActive
-                          ? "bg-primary text-white shadow-md"
-                          : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
-                      }`
-                    }
-                  >
-                    <link.icon size={18} />
-                    {link.label}
-                    {link.to === "/app/conversations" && totalUnread > 0 && (
-                      <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
-                        {totalUnread > 99 ? "99+" : totalUnread}
-                      </span>
-                    )}
-                  </NavLink>
-                ))}
+                {section.links.map((link) => {
+                  const hasUnread = link.to === "/app/conversations" && totalUnread > 0;
+                  return (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      end={link.to === "/app"}
+                      onClick={() => { closeSidebar(); if (link.to === "/app/conversations") resetUnread(); }}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                          isActive
+                            ? "bg-primary text-white shadow-md"
+                            : hasUnread
+                              ? "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              : "text-gray-400 hover:text-white hover:bg-dark-cardSoft"
+                        }`
+                      }
+                    >
+                      <link.icon size={18} />
+                      {link.label}
+                      {hasUnread && (
+                        <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
+                          {totalUnread > 99 ? "99+" : totalUnread}
+                        </span>
+                      )}
+                    </NavLink>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -226,29 +234,34 @@ export default function Layout() {
         {/* Bottom Navigation - Mobile only */}
         <nav id="bottom-nav" className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-dark-card border-t border-dark-border safe-area-bottom">
           <div className="flex items-center justify-around px-1 py-1.5">
-            {getBottomNavItems().map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/app"}
-                onClick={item.to === "/app/conversations" ? resetUnread : undefined}
-                className={({ isActive }) =>
-                  `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all relative ${
-                    isActive
-                      ? "text-primary"
-                      : "text-gray-500"
-                  }`
-                }
-              >
-                <item.icon size={20} />
-                {item.to === "/app/conversations" && totalUnread > 0 && (
-                  <span className="absolute top-0.5 right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[8px] font-bold rounded-full px-0.5 animate-pulse">
-                    {totalUnread > 99 ? "99+" : totalUnread}
-                  </span>
-                )}
-                <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
-              </NavLink>
-            ))}
+            {getBottomNavItems().map((item) => {
+              const hasUnread = item.to === "/app/conversations" && totalUnread > 0;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/app"}
+                  onClick={item.to === "/app/conversations" ? resetUnread : undefined}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all relative ${
+                      isActive
+                        ? "text-primary"
+                        : hasUnread
+                          ? "text-red-400"
+                          : "text-gray-500"
+                    }`
+                  }
+                >
+                  <item.icon size={20} />
+                  {hasUnread && (
+                    <span className="absolute top-0.5 right-1 min-w-[16px] h-[16px] flex items-center justify-center bg-red-500 text-white text-[8px] font-bold rounded-full px-0.5 animate-pulse">
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </span>
+                  )}
+                  <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         </nav>
       </div>
