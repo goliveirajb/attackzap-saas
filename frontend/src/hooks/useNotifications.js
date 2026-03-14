@@ -38,10 +38,13 @@ export function useNotifications(token) {
           // Dispatch to all listeners immediately
           listenersRef.current.forEach((fn) => fn(data));
 
-          // Sound + unread for incoming messages
+          // Sound + unread for incoming messages (only if not on conversations page)
           if (data.type === "new_message" && data.direction === "incoming") {
             playNotificationSound();
-            setTotalUnread((prev) => prev + 1);
+            const onConversations = window.location.pathname.includes("/conversations");
+            if (!onConversations) {
+              setTotalUnread((prev) => prev + 1);
+            }
 
             // Browser notification if tab is not focused
             if (document.hidden && Notification.permission === "granted") {
