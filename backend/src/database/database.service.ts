@@ -14,7 +14,7 @@ export class DatabaseService implements OnModuleInit {
 			password: process.env.DB_PASSWORD || "",
 			database: process.env.DB_DATABASE || "attackzap_saas",
 			waitForConnections: true,
-			connectionLimit: 10,
+			connectionLimit: 50,
 			timezone: "-03:00",
 		});
 
@@ -279,6 +279,20 @@ export class DatabaseService implements OnModuleInit {
 		// Add media columns to quick_replies
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_base64 LONGTEXT DEFAULT NULL AFTER message`).catch(() => {});
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_type VARCHAR(20) DEFAULT NULL AFTER media_base64`).catch(() => {});
+
+		// Performance indexes for high-volume message processing
+		await pool.query(`
+			CREATE INDEX idx_cm_contact_created ON contact_messages (contact_id, created_at)
+		`).catch(() => {});
+		await pool.query(`
+			CREATE INDEX idx_cm_user_created ON contact_messages (user_id, created_at)
+		`).catch(() => {});
+		await pool.query(`
+			CREATE INDEX idx_cm_contact_direction_created ON contact_messages (contact_id, direction, created_at)
+		`).catch(() => {});
+		await pool.query(`
+			CREATE INDEX idx_contacts_user_lastmsg ON contacts (user_id, last_message_at)
+		`).catch(() => {});
 
 		this.logger.log("Tables verified.");
 	}

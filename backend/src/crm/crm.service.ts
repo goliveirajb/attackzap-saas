@@ -242,18 +242,21 @@ export class CrmService implements OnModuleInit {
 			           AND cm.direction = 'incoming'
 			           AND cm.created_at > COALESCE(c.last_read_at, '1970-01-01')
 			        ) as unread_count,
-			        (SELECT cm2.message_text FROM contact_messages cm2
-			         WHERE cm2.contact_id = c.id ORDER BY cm2.created_at DESC LIMIT 1
-			        ) as last_message_text,
-			        (SELECT cm3.message_type FROM contact_messages cm3
-			         WHERE cm3.contact_id = c.id ORDER BY cm3.created_at DESC LIMIT 1
-			        ) as last_message_type,
-			        (SELECT cm4.direction FROM contact_messages cm4
-			         WHERE cm4.contact_id = c.id ORDER BY cm4.created_at DESC LIMIT 1
-			        ) as last_message_direction
+			        lm.message_text as last_message_text,
+			        lm.message_type as last_message_type,
+			        lm.direction as last_message_direction
 			 FROM contacts c
 			 LEFT JOIN crm_stages cs ON c.stage_id = cs.id
 			 LEFT JOIN whatsapp_instances wi ON c.instance_id = wi.id
+			 LEFT JOIN (
+			   SELECT cm1.contact_id, cm1.message_text, cm1.message_type, cm1.direction
+			   FROM contact_messages cm1
+			   INNER JOIN (
+			     SELECT contact_id, MAX(id) as max_id
+			     FROM contact_messages
+			     GROUP BY contact_id
+			   ) cm2 ON cm1.id = cm2.max_id
+			 ) lm ON lm.contact_id = c.id
 			 WHERE c.user_id = ?
 			 ORDER BY c.pinned DESC, c.last_message_at DESC, c.updated_at DESC`,
 			[userId],
@@ -423,9 +426,14 @@ export class CrmService implements OnModuleInit {
 
 		const raw = typeof msg.raw_data === "string" ? JSON.parse(msg.raw_data) : msg.raw_data;
 
-		// Outgoing: base64 stored directly
+		// Legacy: outgoing media may have base64 stored directly (old messages)
 		if (raw.media_base64) {
 			return { base64: raw.media_base64, type: msg.message_type };
+		}
+
+		// Outgoing media (new format) - not stored in DB
+		if (raw.sent && !raw.key) {
+			return null;
 		}
 
 		// Incoming from Evolution webhook: extract base64 from message object
@@ -541,17 +549,12 @@ export class CrmService implements OnModuleInit {
 		// Send via Evolution
 		await this.whatsapp.sendMedia(contact.instance_name, jid, base64, caption, mediaType);
 
-		// Save to DB (store base64 in raw_data so we can display it later)
-		try {
-			await pool.query(
-				`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
-				 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
-				[contactId, userId, caption || `[${mediaType}]`, mediaType, remoteJid, contact.instance_name, JSON.stringify({ media_base64: base64 })],
-			);
-		} catch (dbErr) {
-			// If DB save fails (e.g., packet too large), still consider success since Evolution sent it
-			this.logger.error(`DB save failed for media: ${dbErr.message}`);
-		}
+		// Save to DB — don't store base64 to keep DB lean; media is re-fetched on demand
+		await pool.query(
+			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
+			 VALUES (?, ?, 'outgoing', ?, ?, ?, ?, ?)`,
+			[contactId, userId, caption || `[${mediaType}]`, mediaType, remoteJid, contact.instance_name, JSON.stringify({ mediaType, sent: true })],
+		);
 
 		await pool.query(`UPDATE contacts SET last_message_at = NOW() WHERE id = ?`, [contactId]);
 
@@ -765,7 +768,20 @@ export class CrmService implements OnModuleInit {
 			this.logger.log(`Media message: type=${messageType}, hasBase64=${hasBase64}, keys=${Object.keys(msg).join(",")}`);
 		}
 
-		// Save message
+		// Save message — strip base64 media from raw_data to keep DB lean
+		// Media is fetched on-demand from Evolution API via getMessageMedia()
+		const rawDataLean = { ...data };
+		if (rawDataLean.message) {
+			const msg = { ...rawDataLean.message };
+			for (const field of ["imageMessage", "videoMessage", "audioMessage", "documentMessage"]) {
+				if (msg[field]) {
+					const { base64, ...rest } = msg[field];
+					msg[field] = rest;
+				}
+			}
+			rawDataLean.message = msg;
+		}
+
 		await pool.query(
 			`INSERT INTO contact_messages (contact_id, user_id, direction, message_text, message_type, remote_jid, instance_name, raw_data)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -777,7 +793,7 @@ export class CrmService implements OnModuleInit {
 				messageType,
 				remoteJid,
 				instanceName,
-				JSON.stringify(data),
+				JSON.stringify(rawDataLean),
 			],
 		);
 
