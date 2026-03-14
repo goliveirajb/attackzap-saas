@@ -17,11 +17,6 @@ function PrivateRoute({ children }) {
   return token ? children : <Navigate to="/login" replace state={{ from: "/app" }} />;
 }
 
-// Mobile goes to conversations, desktop goes to dashboard
-function MobileRedirect() {
-  const isMobile = window.innerWidth < 768;
-  return isMobile ? <Navigate to="/app/conversations" replace /> : <Dashboard />;
-}
 
 function AppRoutes() {
   return (
@@ -37,7 +32,7 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        <Route index element={<MobileRedirect />} />
+        <Route index element={<Dashboard />} />
         <Route path="instances" element={<Instances />} />
         <Route path="conversations" element={<Conversations />} />
         <Route path="crm" element={<CRM />} />

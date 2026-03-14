@@ -65,9 +65,9 @@ const getMenuSections = (role) => {
 
 // Bottom nav items for mobile
 const getBottomNavItems = () => [
+  { to: "/app", label: "Inicio", icon: FaHome, end: true },
   { to: "/app/conversations", label: "Conversas", icon: FaComments },
   { to: "/app/crm", label: "Contatos", icon: FaUsers },
-  { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
   { to: "/app/ai", label: "IA", icon: FaBrain },
 ];
 
@@ -240,7 +240,7 @@ export default function Layout() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === "/app"}
+                  end={!!item.end}
                   onClick={item.to === "/app/conversations" ? resetUnread : undefined}
                   className={({ isActive }) =>
                     `flex flex-col items-center justify-center py-1.5 px-2 rounded-xl min-w-[56px] transition-all relative ${
