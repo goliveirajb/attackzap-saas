@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Req, UseGuards, Query, Sse } from "@nestjs/common";
 import { CrmService } from "./crm.service";
 import { CrmEventsService } from "./crm-events.service";
+import { AiService } from "./ai.service";
 import { JwtAuthGuard } from "~/auth/jwt-auth.guard";
 
 @Controller("crm")
@@ -8,6 +9,7 @@ export class CrmController {
 	constructor(
 		private readonly svc: CrmService,
 		private readonly events: CrmEventsService,
+		private readonly ai: AiService,
 	) {}
 
 	// ==================== DASHBOARD ====================
@@ -185,6 +187,32 @@ export class CrmController {
 	@UseGuards(JwtAuthGuard)
 	sseEvents(@Req() req) {
 		return this.events.subscribe(req.user.id);
+	}
+
+	// ==================== AI CONFIG ====================
+
+	@Get("ai/config")
+	@UseGuards(JwtAuthGuard)
+	async getAiConfig(@Req() req) {
+		return this.ai.getConfig(req.user.id);
+	}
+
+	@Put("ai/config")
+	@UseGuards(JwtAuthGuard)
+	async saveAiConfig(@Req() req, @Body() body: any) {
+		return this.ai.saveConfig(req.user.id, body);
+	}
+
+	@Get("ai/instances")
+	@UseGuards(JwtAuthGuard)
+	async getAiInstances(@Req() req) {
+		return this.ai.getInstanceToggles(req.user.id);
+	}
+
+	@Put("ai/instances/:id/toggle")
+	@UseGuards(JwtAuthGuard)
+	async toggleAiInstance(@Req() req, @Param("id") id: string, @Body() body: { active: boolean }) {
+		return this.ai.toggleInstance(req.user.id, Number(id), body.active);
 	}
 
 	// ==================== WEBHOOK (public - called by Evolution) ====================

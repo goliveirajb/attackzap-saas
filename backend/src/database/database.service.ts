@@ -244,6 +244,35 @@ export class DatabaseService implements OnModuleInit {
 			)
 		`);
 
+		// AI config table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS ai_config (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL UNIQUE,
+				openai_key VARCHAR(255) DEFAULT NULL,
+				model VARCHAR(50) DEFAULT 'gpt-4o-mini',
+				system_prompt TEXT DEFAULT NULL,
+				active TINYINT(1) DEFAULT 0,
+				ignore_groups TINYINT(1) DEFAULT 1,
+				max_context_messages INT DEFAULT 10,
+				response_delay_ms INT DEFAULT 2000,
+				pause_after_human_mins INT DEFAULT 30,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)
+		`);
+
+		// AI per-instance toggle
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS ai_instance_toggle (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				instance_id INT NOT NULL UNIQUE,
+				active TINYINT(1) DEFAULT 0,
+				FOREIGN KEY (instance_id) REFERENCES whatsapp_instances(id) ON DELETE CASCADE
+			)
+		`);
+
 		// Add media columns to quick_replies
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_base64 LONGTEXT DEFAULT NULL AFTER message`).catch(() => {});
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_type VARCHAR(20) DEFAULT NULL AFTER media_base64`).catch(() => {});

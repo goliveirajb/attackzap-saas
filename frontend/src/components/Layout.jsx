@@ -12,6 +12,7 @@ import {
   FaBars,
   FaTimes,
   FaUserShield,
+  FaBrain,
 } from "react-icons/fa";
 
 const getMenuSections = (role) => {
@@ -39,6 +40,7 @@ const getMenuSections = (role) => {
       label: "AUTOMACOES",
       links: [
         { to: "/app/flows", label: "Fluxos", icon: FaProjectDiagram },
+        { to: "/app/ai", label: "Assistente IA", icon: FaBrain },
       ],
     },
     {

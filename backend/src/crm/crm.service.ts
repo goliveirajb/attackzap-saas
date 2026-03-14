@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { DatabaseService } from "~/database/database.service";
 import { WhatsappService } from "~/whatsapp/whatsapp.service";
 import { CrmEventsService } from "./crm-events.service";
@@ -7,17 +8,20 @@ import { PushService } from "~/push/push.service";
 @Injectable()
 export class CrmService implements OnModuleInit {
 	private readonly logger = new Logger(CrmService.name);
+	private aiService: any; // Lazy-loaded to avoid circular dependency
 
 	constructor(
 		private readonly db: DatabaseService,
 		private readonly whatsapp: WhatsappService,
 		private readonly events: CrmEventsService,
 		private readonly push: PushService,
+		private readonly moduleRef: ModuleRef,
 	) {}
 
 	async onModuleInit() {
-		// Seed default stages for users who don't have any
-		// (done on demand per user in getStages)
+		// Lazy-load AiService to avoid circular dependency
+		const { AiService } = await import("./ai.service");
+		this.aiService = this.moduleRef.get(AiService, { strict: false });
 	}
 
 	// ==================== DASHBOARD STATS ====================
@@ -800,6 +804,20 @@ export class CrmService implements OnModuleInit {
 				body: body.slice(0, 100),
 				data: { contactId: contact.id, url: "/app/conversations" },
 			}).catch((err) => this.logger.error(`Push error: ${err.message}`));
+
+			// AI auto-reply (fire-and-forget)
+			if (this.aiService) {
+				this.aiService.handleIncomingMessage({
+					userId,
+					contactId: contact.id,
+					instanceId: instanceId,
+					instanceName,
+					phone,
+					isGroup,
+					messageText,
+					contactName: contactName || pushName || null,
+				}).catch((err) => this.logger.error(`AI error: ${err.message}`));
+			}
 		}
 
 		return { ok: true, contactId: contact.id, phone };

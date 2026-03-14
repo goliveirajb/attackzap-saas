@@ -10,6 +10,7 @@ import CRM from "./pages/CRM";
 import Conversations from "./pages/Conversations";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import AiConfig from "./pages/AiConfig";
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
@@ -42,6 +43,7 @@ function AppRoutes() {
         <Route path="crm" element={<CRM />} />
         <Route path="flows" element={<Automations />} />
         <Route path="automations" element={<Automations />} />
+        <Route path="ai" element={<AiConfig />} />
         <Route path="settings" element={<Settings />} />
         <Route path="admin" element={<Admin />} />
       </Route>
