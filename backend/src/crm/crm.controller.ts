@@ -104,8 +104,8 @@ export class CrmController {
 
 	@Post("quick-replies")
 	@UseGuards(JwtAuthGuard)
-	async createQuickReply(@Req() req, @Body() body: { title: string; message: string }) {
-		return this.svc.createQuickReply(req.user.id, body.title, body.message);
+	async createQuickReply(@Req() req, @Body() body: { title: string; message: string; media_base64?: string; media_type?: string }) {
+		return this.svc.createQuickReply(req.user.id, body.title, body.message, body.media_base64, body.media_type);
 	}
 
 	@Delete("quick-replies/:id")

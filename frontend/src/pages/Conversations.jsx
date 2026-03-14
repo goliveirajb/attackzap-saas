@@ -6,7 +6,7 @@ import {
   FaArrowLeft, FaEllipsisV, FaTimes, FaPhone, FaEnvelope, FaTags,
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
   FaSmile, FaPaperclip, FaTrash,
-  FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack, FaArchive,
+  FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack, FaArchive, FaPlay,
 } from "react-icons/fa";
 
 // Send sound - short "whoosh" tone
@@ -900,22 +900,65 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
     });
   };
 
-  const selectQuickReply = (qr) => {
-    setText(qr.message);
+  const selectQuickReply = async (qr) => {
     setShowQuickReplies(false);
-    inputRef.current?.focus();
+    // If has media, send media + caption
+    if (qr.media_base64 && qr.media_type) {
+      setUploadingMedia(true);
+      playSendSound();
+      const toastId = toast.loading("Enviando...");
+      try {
+        const res = await authFetch(`/api/crm/contacts/${contact.id}/send-media`, {
+          method: "POST",
+          body: JSON.stringify({ base64: qr.media_base64, caption: qr.message || "", mediaType: qr.media_type }),
+        });
+        toast.dismiss(toastId);
+        if (!res.ok) throw new Error();
+        toast.success("Enviado!");
+        loadMessages();
+      } catch {
+        toast.dismiss(toastId);
+        toast.error("Erro ao enviar midia");
+      } finally {
+        setUploadingMedia(false);
+      }
+    } else {
+      setText(qr.message);
+      inputRef.current?.focus();
+    }
+  };
+
+  const [newQrMedia, setNewQrMedia] = useState(null); // { base64, type, preview }
+
+  const handleQrMediaSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mediaType = file.type.startsWith("video") ? "video" : "image";
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewQrMedia({ base64: reader.result, type: mediaType, preview: URL.createObjectURL(file), name: file.name });
+    };
+    reader.readAsDataURL(file);
   };
 
   const addQuickReply = async () => {
-    if (!newQrTitle.trim() || !newQrMessage.trim()) return;
+    if (!newQrTitle.trim()) return toast.error("Informe o titulo");
+    if (!newQrMessage.trim() && !newQrMedia) return toast.error("Informe a mensagem ou midia");
     try {
+      const payload = {
+        title: newQrTitle.trim(),
+        message: newQrMessage.trim(),
+        media_base64: newQrMedia?.base64 || undefined,
+        media_type: newQrMedia?.type || undefined,
+      };
       const res = await authFetch("/api/crm/quick-replies", {
         method: "POST",
-        body: JSON.stringify({ title: newQrTitle.trim(), message: newQrMessage.trim() }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error();
       setNewQrTitle("");
       setNewQrMessage("");
+      setNewQrMedia(null);
       loadQuickReplies();
       toast.success("Resposta rapida salva!");
     } catch { toast.error("Erro ao salvar"); }
@@ -1213,9 +1256,18 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                     {quickReplies.map((qr) => (
                       <div key={qr.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-cardSoft hover:bg-dark-cardSoft/80 cursor-pointer group transition"
                         onClick={() => selectQuickReply(qr)}>
+                        {qr.media_type && (
+                          <div className="w-8 h-8 rounded bg-dark-body flex items-center justify-center flex-shrink-0">
+                            {qr.media_type === "video" ? (
+                              <FaPlay size={8} className="text-primary" />
+                            ) : (
+                              <FaImage size={10} className="text-primary" />
+                            )}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-[11px] text-primary font-semibold truncate">{qr.title}</p>
-                          <p className="text-[10px] text-gray-400 truncate">{qr.message}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{qr.message || (qr.media_type ? `[${qr.media_type}]` : "")}</p>
                         </div>
                         <button onClick={(e) => { e.stopPropagation(); deleteQuickReply(qr.id); }}
                           className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
@@ -1228,16 +1280,31 @@ function ChatPanel({ contact: initialContact, authFetch, onBack, subscribeEvents
                   <p className="text-[10px] text-gray-600 mb-2">Nenhuma resposta rapida cadastrada</p>
                 )}
                 {/* Add new */}
-                <div className="flex gap-1.5 items-end">
-                  <input value={newQrTitle} onChange={(e) => setNewQrTitle(e.target.value)} placeholder="Titulo"
-                    className="w-24 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
-                  <input value={newQrMessage} onChange={(e) => setNewQrMessage(e.target.value)} placeholder="Mensagem..."
-                    onKeyDown={(e) => { if (e.key === "Enter") addQuickReply(); }}
-                    className="flex-1 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
-                  <button onClick={addQuickReply}
-                    className="px-2.5 py-1.5 rounded-lg bg-primary text-white text-[10px] font-medium hover:bg-primaryLight transition flex-shrink-0">
-                    <FaPlus size={9} />
-                  </button>
+                <div className="space-y-1.5">
+                  {newQrMedia && (
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-dark-body border border-primary/30">
+                      <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        {newQrMedia.type === "video" ? <FaPlay size={7} className="text-primary" /> : <FaImage size={8} className="text-primary" />}
+                      </div>
+                      <span className="text-[10px] text-gray-400 truncate flex-1">{newQrMedia.name}</span>
+                      <button onClick={() => setNewQrMedia(null)} className="text-gray-600 hover:text-red-400 flex-shrink-0"><FaTimes size={8} /></button>
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 items-end">
+                    <input value={newQrTitle} onChange={(e) => setNewQrTitle(e.target.value)} placeholder="Titulo"
+                      className="w-24 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                    <input value={newQrMessage} onChange={(e) => setNewQrMessage(e.target.value)} placeholder="Mensagem / legenda..."
+                      onKeyDown={(e) => { if (e.key === "Enter") addQuickReply(); }}
+                      className="flex-1 px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-[10px] text-white placeholder:text-gray-600 focus:outline-none focus:border-primary" />
+                    <label className="px-2 py-1.5 rounded-lg border border-dark-border bg-dark-body text-gray-500 hover:text-primary cursor-pointer transition flex-shrink-0" title="Anexar imagem ou video">
+                      <FaImage size={11} />
+                      <input type="file" accept="image/*,video/*" className="hidden" onChange={handleQrMediaSelect} />
+                    </label>
+                    <button onClick={addQuickReply}
+                      className="px-2.5 py-1.5 rounded-lg bg-primary text-white text-[10px] font-medium hover:bg-primaryLight transition flex-shrink-0">
+                      <FaPlus size={9} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

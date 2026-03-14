@@ -244,6 +244,10 @@ export class DatabaseService implements OnModuleInit {
 			)
 		`);
 
+		// Add media columns to quick_replies
+		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_base64 LONGTEXT DEFAULT NULL AFTER message`).catch(() => {});
+		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_type VARCHAR(20) DEFAULT NULL AFTER media_base64`).catch(() => {});
+
 		this.logger.log("Tables verified.");
 	}
 }

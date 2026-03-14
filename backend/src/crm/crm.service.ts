@@ -335,13 +335,13 @@ export class CrmService implements OnModuleInit {
 		return rows;
 	}
 
-	async createQuickReply(userId: number, title: string, message: string) {
+	async createQuickReply(userId: number, title: string, message: string, mediaBase64?: string, mediaType?: string) {
 		const pool = this.db.getPool();
 		const [result] = await pool.query(
-			`INSERT INTO quick_replies (user_id, title, message) VALUES (?, ?, ?)`,
-			[userId, title, message],
+			`INSERT INTO quick_replies (user_id, title, message, media_base64, media_type) VALUES (?, ?, ?, ?, ?)`,
+			[userId, title, message, mediaBase64 || null, mediaType || null],
 		);
-		return { id: (result as any).insertId, title, message };
+		return { id: (result as any).insertId, title, message, media_base64: mediaBase64 || null, media_type: mediaType || null };
 	}
 
 	async deleteQuickReply(id: number, userId: number) {
