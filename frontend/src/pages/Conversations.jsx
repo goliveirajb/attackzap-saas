@@ -559,7 +559,7 @@ export default function Conversations() {
                   <div className="relative w-[52px] h-[52px] flex-shrink-0">
                     <ContactAvatar contact={c} size={13} textSize="text-base" authFetch={authFetch} />
                     {unread > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-green-500 text-white text-[10px] font-bold rounded-full px-1">
+                      <span className="absolute -top-1 -right-1 min-w-[20px] h-5 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 animate-pulse">
                         {unread > 99 ? "99+" : unread}
                       </span>
                     )}
@@ -574,7 +574,7 @@ export default function Conversations() {
                       </p>
                       {formatChatDate(c.last_message_at) && (
                         <span className={`text-[13px] flex-shrink-0 ml-2 ${
-                          unread > 0 ? "text-green-400 font-medium" : "text-gray-500"
+                          unread > 0 ? "text-red-400 font-medium" : "text-gray-500"
                         }`}>
                           {formatChatDate(c.last_message_at)}
                         </span>
