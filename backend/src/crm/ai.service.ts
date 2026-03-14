@@ -126,20 +126,24 @@ export class AiService {
 		const { userId, contactId, instanceId, instanceName, phone, isGroup, messageText, contactName } = params;
 		const pool = this.db.getPool();
 
+		this.logger.log(`AI check: user=${userId}, contact=${contactId}, instance=${instanceId} (${instanceName}), phone=${phone}, isGroup=${isGroup}`);
+
 		// 1. Get AI config
 		const [cfgRows] = await pool.query(`SELECT * FROM ai_config WHERE user_id = ? AND active = 1`, [userId]);
 		const config = (cfgRows as any[])[0];
-		if (!config || !config.openai_key) return;
+		if (!config) { this.logger.log(`AI skip: no active config for user ${userId}`); return; }
+		if (!config.openai_key) { this.logger.log(`AI skip: no OpenAI key for user ${userId}`); return; }
 
 		// 2. Check ignore groups
-		if (isGroup && config.ignore_groups) return;
+		if (isGroup && config.ignore_groups) { this.logger.log(`AI skip: ignoring group ${phone}`); return; }
 
 		// 3. Check instance toggle
 		const [toggleRows] = await pool.query(
 			`SELECT active FROM ai_instance_toggle WHERE instance_id = ?`, [instanceId],
 		);
 		const toggle = (toggleRows as any[])[0];
-		if (!toggle || !toggle.active) return;
+		if (!toggle) { this.logger.log(`AI skip: no toggle found for instance ${instanceId}`); return; }
+		if (!toggle.active) { this.logger.log(`AI skip: instance ${instanceId} toggle is off`); return; }
 
 		// 4. Check if human responded recently (pause AI)
 		if (config.pause_after_human_mins > 0) {
@@ -152,13 +156,15 @@ export class AiService {
 				[contactId, config.pause_after_human_mins],
 			);
 			if ((humanMsgs as any[]).length > 0) {
-				this.logger.log(`AI paused for contact ${contactId}: human replied within ${config.pause_after_human_mins}min`);
+				this.logger.log(`AI skip: human replied within ${config.pause_after_human_mins}min for contact ${contactId}`);
 				return;
 			}
 		}
 
 		// 5. Skip empty messages
-		if (!messageText || messageText.trim().length === 0) return;
+		if (!messageText || messageText.trim().length === 0) { this.logger.log(`AI skip: empty message`); return; }
+
+		this.logger.log(`AI proceeding: will call OpenAI for contact ${contactId}, text="${messageText.slice(0, 50)}..."`);
 
 		// 6. Get conversation context
 		const contextLimit = config.max_context_messages || 10;
