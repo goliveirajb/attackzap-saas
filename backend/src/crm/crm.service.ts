@@ -385,6 +385,15 @@ export class CrmService implements OnModuleInit {
 		return { ok: true, archived };
 	}
 
+	async toggleMute(userId: number, contactId: number, muted: boolean) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE contacts SET muted = ? WHERE id = ? AND user_id = ?`,
+			[muted ? 1 : 0, contactId, userId],
+		);
+		return { ok: true, muted };
+	}
+
 	// ==================== MESSAGES ====================
 
 	async getMessages(contactId: number, limit = 50) {
@@ -788,12 +797,13 @@ export class CrmService implements OnModuleInit {
 				instanceName,
 				instanceId: instanceId,
 				isGroup: isGroup,
+				muted: !!contact.muted,
 				createdAt: new Date().toISOString(),
 			},
 		});
 
-		// Send Web Push notification for incoming messages (fire-and-forget, don't block response)
-		if (!fromMe) {
+		// Send Web Push notification for incoming messages (skip muted contacts)
+		if (!fromMe && !contact.muted) {
 			const title = contactName || pushName || phone;
 			const body = messageType !== "text"
 				? `[${messageType}] ${messageText || ""}`

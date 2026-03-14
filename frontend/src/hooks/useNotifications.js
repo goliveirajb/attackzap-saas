@@ -38,9 +38,9 @@ export function useNotifications(token) {
           // Dispatch to all listeners immediately
           listenersRef.current.forEach((fn) => fn(data));
 
-          // Sound + unread for incoming messages (only if not on conversations page)
+          // Sound + unread for incoming messages (skip muted, skip if on conversations page)
           if (data.type === "new_message" && data.direction === "incoming") {
-            playNotificationSound();
+            if (!data.muted) playNotificationSound();
             const onConversations = window.location.pathname.includes("/conversations");
             if (!onConversations) {
               setTotalUnread((prev) => prev + 1);

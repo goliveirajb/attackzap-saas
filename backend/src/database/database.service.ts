@@ -273,6 +273,9 @@ export class DatabaseService implements OnModuleInit {
 			)
 		`);
 
+		// Add muted column to contacts
+		await pool.query(`ALTER TABLE contacts ADD COLUMN muted TINYINT(1) DEFAULT 0 AFTER archived`).catch(() => {});
+
 		// Add media columns to quick_replies
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_base64 LONGTEXT DEFAULT NULL AFTER message`).catch(() => {});
 		await pool.query(`ALTER TABLE quick_replies ADD COLUMN media_type VARCHAR(20) DEFAULT NULL AFTER media_base64`).catch(() => {});

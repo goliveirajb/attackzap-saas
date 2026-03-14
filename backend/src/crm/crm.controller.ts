@@ -147,6 +147,12 @@ export class CrmController {
 		return this.svc.toggleArchive(req.user.id, Number(id), body.archived);
 	}
 
+	@Put("contacts/:id/mute")
+	@UseGuards(JwtAuthGuard)
+	async toggleMute(@Req() req, @Param("id") id: string, @Body() body: { muted: boolean }) {
+		return this.svc.toggleMute(req.user.id, Number(id), body.muted);
+	}
+
 	@Post("sync-group-names")
 	@UseGuards(JwtAuthGuard)
 	async syncGroupNames(@Req() req) {

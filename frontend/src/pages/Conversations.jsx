@@ -7,6 +7,7 @@ import {
   FaStickyNote, FaPen, FaImage, FaMicrophone, FaVideo, FaFile,
   FaSmile, FaPaperclip, FaTrash,
   FaBolt, FaPlus, FaUsers, FaChevronDown, FaThumbtack, FaArchive, FaPlay,
+  FaVolumeMute, FaVolumeUp,
 } from "react-icons/fa";
 
 // Send sound - short "whoosh" tone
@@ -368,6 +369,20 @@ export default function Conversations() {
     }
   };
 
+  const toggleMute = async (contactId, currentMuted) => {
+    const muted = !currentMuted;
+    setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, muted } : c));
+    setDropdownId(null);
+    try {
+      await authFetch(`/api/crm/contacts/${contactId}/mute`, {
+        method: "PUT",
+        body: JSON.stringify({ muted }),
+      });
+    } catch {
+      setContacts((prev) => prev.map((c) => c.id === contactId ? { ...c, muted: currentMuted } : c));
+    }
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!dropdownId) return;
@@ -589,6 +604,7 @@ export default function Conversations() {
                         }
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        {!!c.muted && <FaVolumeMute size={10} className="text-gray-500" />}
                         {!!c.pinned && <FaThumbtack size={10} className="text-gray-500" />}
                         {c.stage_name && (
                           <span className="text-[8px] px-1.5 py-0.5 rounded-full font-medium"
@@ -618,6 +634,15 @@ export default function Conversations() {
                       >
                         <FaThumbtack size={12} className={c.pinned ? "text-primary" : ""} />
                         {c.pinned ? "Desafixar conversa" : "Fixar conversa"}
+                      </button>
+                      <button
+                        onClick={() => toggleMute(c.id, c.muted)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-dark-cardSoft transition"
+                      >
+                        {c.muted
+                          ? <><FaVolumeUp size={12} className="text-green-400" /> Ativar notificacoes</>
+                          : <><FaVolumeMute size={12} /> Silenciar conversa</>
+                        }
                       </button>
                       <button
                         onClick={() => toggleArchive(c.id, c.archived)}
