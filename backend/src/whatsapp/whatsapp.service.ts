@@ -404,6 +404,15 @@ export class WhatsappService {
 		}
 	}
 
+	// Sync status in DB by instance_name
+	async syncInstanceStatus(instanceName: string, status: string) {
+		const pool = this.db.getPool();
+		await pool.query(
+			`UPDATE whatsapp_instances SET status = ? WHERE instance_name = ? AND status != ?`,
+			[status, instanceName, status],
+		);
+	}
+
 	// Listar instancias do usuario
 	async listByUser(userId: number) {
 		const pool = this.db.getPool();

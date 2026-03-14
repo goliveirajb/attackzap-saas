@@ -26,9 +26,12 @@ export class WhatsappController {
 	async status(@Param("name") name: string) {
 		const result = await this.whatsappService.getConnectionStatus(name);
 
-		// Auto-configure CRM webhook when instance connects
+		// Sync DB status and auto-configure webhook when connected
 		if (result.status === "connected") {
+			this.whatsappService.syncInstanceStatus(name, "connected").catch(() => {});
 			this.whatsappService.autoConfigureCrmWebhook(name).catch(() => {});
+		} else if (result.status === "disconnected") {
+			this.whatsappService.syncInstanceStatus(name, "disconnected").catch(() => {});
 		}
 
 		return result;

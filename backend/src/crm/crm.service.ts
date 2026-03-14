@@ -588,6 +588,22 @@ export class CrmService implements OnModuleInit {
 		const pool = this.db.getPool();
 
 		const event = payload?.event;
+
+		// Handle connection status updates from Evolution webhook
+		if (event === "connection.update") {
+			const instanceName = payload?.instance;
+			const state = payload?.data?.state;
+			if (instanceName && state) {
+				const status = state === "open" ? "connected" : state === "close" ? "disconnected" : "connecting";
+				await pool.query(
+					`UPDATE whatsapp_instances SET status = ? WHERE instance_name = ?`,
+					[status, instanceName],
+				);
+				this.logger.log(`Connection update: ${instanceName} -> ${status}`);
+			}
+			return { ok: true };
+		}
+
 		if (event !== "messages.upsert") return { ignored: true };
 
 		const data = payload?.data;

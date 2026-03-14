@@ -19,7 +19,21 @@ export default function Instances() {
     try {
       const res = await authFetch("/api/whatsapp/instances");
       const data = await res.json();
-      setInstances(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setInstances(list);
+
+      // Sync real status from Evolution for each instance (background)
+      list.forEach(async (inst) => {
+        try {
+          const sRes = await authFetch(`/api/whatsapp/instances/${inst.instance_name}/status`);
+          const sData = await sRes.json();
+          if (sData.status && sData.status !== inst.status) {
+            setInstances((prev) => prev.map((i) =>
+              i.id === inst.id ? { ...i, status: sData.status } : i
+            ));
+          }
+        } catch {}
+      });
     } catch {
       toast.error("Erro ao carregar instancias");
     } finally {
