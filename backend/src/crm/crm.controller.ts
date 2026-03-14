@@ -10,6 +10,14 @@ export class CrmController {
 		private readonly events: CrmEventsService,
 	) {}
 
+	// ==================== DASHBOARD ====================
+
+	@Get("dashboard-stats")
+	@UseGuards(JwtAuthGuard)
+	async getDashboardStats(@Req() req) {
+		return this.svc.getDashboardStats(req.user.id);
+	}
+
 	// ==================== STAGES ====================
 
 	@Get("stages")

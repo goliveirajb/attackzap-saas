@@ -20,6 +20,92 @@ export class CrmService implements OnModuleInit {
 		// (done on demand per user in getStages)
 	}
 
+	// ==================== DASHBOARD STATS ====================
+
+	async getDashboardStats(userId: number) {
+		const pool = this.db.getPool();
+
+		// Total contacts
+		const [[{ total_contacts }]] = await pool.query(
+			`SELECT COUNT(*) as total_contacts FROM contacts WHERE user_id = ?`, [userId],
+		) as any;
+
+		// Total messages
+		const [[{ total_messages }]] = await pool.query(
+			`SELECT COUNT(*) as total_messages FROM contact_messages WHERE user_id = ?`, [userId],
+		) as any;
+
+		// Messages incoming vs outgoing
+		const [directionRows] = await pool.query(
+			`SELECT direction, COUNT(*) as count FROM contact_messages WHERE user_id = ? GROUP BY direction`, [userId],
+		) as any;
+		const incoming = directionRows.find((r: any) => r.direction === "incoming")?.count || 0;
+		const outgoing = directionRows.find((r: any) => r.direction === "outgoing")?.count || 0;
+
+		// Messages per day (last 14 days)
+		const [messagesPerDay] = await pool.query(
+			`SELECT DATE(created_at) as date, direction, COUNT(*) as count
+			 FROM contact_messages WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+			 GROUP BY DATE(created_at), direction ORDER BY date ASC`, [userId],
+		) as any;
+
+		// Contacts per stage
+		const [contactsPerStage] = await pool.query(
+			`SELECT COALESCE(s.name, 'Sem etapa') as stage, COALESCE(s.color, '#666666') as color, COUNT(c.id) as count
+			 FROM contacts c LEFT JOIN crm_stages s ON c.stage_id = s.id
+			 WHERE c.user_id = ? GROUP BY c.stage_id, s.name, s.color ORDER BY count DESC`, [userId],
+		) as any;
+
+		// New contacts per day (last 14 days)
+		const [newContactsPerDay] = await pool.query(
+			`SELECT DATE(created_at) as date, COUNT(*) as count
+			 FROM contacts WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+			 GROUP BY DATE(created_at) ORDER BY date ASC`, [userId],
+		) as any;
+
+		// Top 5 contacts by message count
+		const [topContacts] = await pool.query(
+			`SELECT c.id, COALESCE(c.name, c.push_name, c.phone) as name, c.phone, COUNT(m.id) as msg_count
+			 FROM contacts c JOIN contact_messages m ON c.id = m.contact_id
+			 WHERE c.user_id = ? GROUP BY c.id ORDER BY msg_count DESC LIMIT 5`, [userId],
+		) as any;
+
+		// Messages by hour of day (response time pattern)
+		const [messagesByHour] = await pool.query(
+			`SELECT HOUR(created_at) as hour, direction, COUNT(*) as count
+			 FROM contact_messages WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+			 GROUP BY HOUR(created_at), direction ORDER BY hour ASC`, [userId],
+		) as any;
+
+		// Active instances
+		const [[{ connected_instances }]] = await pool.query(
+			`SELECT COUNT(*) as connected_instances FROM whatsapp_instances WHERE user_id = ? AND status = 'connected'`, [userId],
+		) as any;
+		const [[{ total_instances }]] = await pool.query(
+			`SELECT COUNT(*) as total_instances FROM whatsapp_instances WHERE user_id = ?`, [userId],
+		) as any;
+
+		// Unread contacts count
+		const [[{ unread_contacts }]] = await pool.query(
+			`SELECT COUNT(*) as unread_contacts FROM contacts WHERE user_id = ? AND (last_read_at IS NULL AND last_message_at IS NOT NULL OR last_message_at > last_read_at)`, [userId],
+		) as any;
+
+		return {
+			total_contacts: Number(total_contacts),
+			total_messages: Number(total_messages),
+			incoming: Number(incoming),
+			outgoing: Number(outgoing),
+			connected_instances: Number(connected_instances),
+			total_instances: Number(total_instances),
+			unread_contacts: Number(unread_contacts),
+			messagesPerDay,
+			contactsPerStage,
+			newContactsPerDay,
+			topContacts,
+			messagesByHour,
+		};
+	}
+
 	// ==================== STAGES ====================
 
 	async getStages(userId: number) {
