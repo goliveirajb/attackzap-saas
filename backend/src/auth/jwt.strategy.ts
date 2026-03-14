@@ -1,10 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import { DatabaseService } from "~/database/database.service";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-	constructor() {
+	constructor(private readonly db: DatabaseService) {
 		super({
 			jwtFromRequest: ExtractJwt.fromExtractors([
 				ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -16,6 +17,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 	}
 
 	async validate(payload: any) {
-		return { id: payload.id, email: payload.email };
+		const pool = this.db.getPool();
+		const [rows] = await pool.query(
+			`SELECT id, email, active FROM users WHERE id = ?`,
+			[payload.id],
+		);
+		const user = (rows as any[])[0];
+		if (!user || !user.active) {
+			throw new UnauthorizedException("Conta desativada");
+		}
+		return { id: user.id, email: user.email };
 	}
 }

@@ -29,7 +29,7 @@ export class AuthService {
 	async login(email: string, password: string) {
 		const pool = this.db.getPool();
 		const [rows] = await pool.query(
-			`SELECT id, name, email, password, plan, role FROM users WHERE email = ?`,
+			`SELECT id, name, email, password, plan, role, active FROM users WHERE email = ?`,
 			[email],
 		);
 
@@ -38,6 +38,8 @@ export class AuthService {
 
 		const valid = await bcrypt.compare(password, user.password);
 		if (!valid) throw new Error("Credenciais invalidas");
+
+		if (!user.active) throw new Error("Conta desativada");
 
 		const token = this.jwtService.sign({ id: user.id, email: user.email });
 

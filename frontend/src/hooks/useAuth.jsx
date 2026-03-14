@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
 
   const authFetch = useCallback(
     async (url, options = {}) => {
-      return fetch(url, {
+      const res = await fetch(url, {
         ...options,
         headers: {
           "Content-Type": "application/json",
@@ -66,6 +66,13 @@ export function AuthProvider({ children }) {
           ...options.headers,
         },
       });
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setToken(null);
+        setUser(null);
+      }
+      return res;
     },
     [token]
   );
